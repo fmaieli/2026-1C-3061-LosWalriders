@@ -1,8 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using System;
-using TGC.MonoGame.TP.SourceCode.Entities.Level;
+using TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives;
 
 namespace TGC.MonoGame.TP;
 
