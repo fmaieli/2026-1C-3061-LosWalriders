@@ -24,11 +24,13 @@ float Time = 0;
 struct VertexShaderInput
 {
 	float4 Position : POSITION0;
+	float4 Color	: COLOR0;
 };
 
 struct VertexShaderOutput
 {
 	float4 Position : SV_POSITION;
+	float4 Color    : COLOR0;
 };
 
 VertexShaderOutput MainVS(in VertexShaderInput input)
@@ -42,12 +44,14 @@ VertexShaderOutput MainVS(in VertexShaderInput input)
 	// View space to Projection space
     output.Position = mul(viewPosition, Projection);
 
+	output.Color = input.Color;
+
     return output;
 }
 
-float4 MainPS(VertexShaderOutput input) : COLOR
+float4 MainPS(VertexShaderOutput input) : COLOR0
 {
-    return float4(DiffuseColor, 1.0);
+	return float4(input.Color.rgb * DiffuseColor, input.Color.a);
 }
 
 technique BasicColorDrawing

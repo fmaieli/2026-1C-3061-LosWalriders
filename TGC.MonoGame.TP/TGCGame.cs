@@ -1,7 +1,8 @@
-﻿using System;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
+using TGC.MonoGame.TP.SourceCode.Entities.Level;
 
 namespace TGC.MonoGame.TP;
 
@@ -18,16 +19,24 @@ public class TGCGame : Game
     public const string ContentFolderSounds = "Sounds/";
     public const string ContentFolderSpriteFonts = "SpriteFonts/";
     public const string ContentFolderTextures = "Textures/";
-    
-    private readonly GraphicsDeviceManager _graphics;
 
-    private Effect _effect;
-    private Model _model;
-    private Matrix _projection;
+    private readonly GraphicsDeviceManager _graphics;
+    
+    private Model _model;    
     private float _rotation;
     private SpriteBatch _spriteBatch;
+
     private Matrix _view;
     private Matrix _world;
+    private Matrix _projection;
+
+    private Effect _effect;
+
+    private VertexBuffer _roomVertexBuffer;
+    private IndexBuffer _roomIndexBuffer;
+
+    private Vector3 _cameraPosition = new Vector3(0, 30, 150);
+    private float _playerRotation = 0f;
 
     /// <summary>
     ///     Constructor del juego.
@@ -67,7 +76,7 @@ public class TGCGame : Game
         _world = Matrix.Identity;
         _view = Matrix.CreateLookAt(Vector3.UnitZ * 150, Vector3.Zero, Vector3.Up);
         _projection =
-            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 250);
+            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 500);
 
         base.Initialize();
     }
@@ -83,22 +92,47 @@ public class TGCGame : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
 
         // Cargo el modelo del logo.
-        _model = Content.Load<Model>(ContentFolder3D + "tgc-logo/tgc-logo");
+        //_model = Content.Load<Model>(ContentFolder3D + "tgc-logo/tgc-logo");
 
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
 
-        // Asigno el efecto que cargue a cada parte del mesh.
-        // Un modelo puede tener mas de 1 mesh internamente.
-        foreach (var mesh in _model.Meshes)
+        // Creo el cuarto
+        var room = new Room();
+        VertexPositionColor[] vertices = room.CreateRoom(width: 150f, height: 120f, depth: 150f);
+
+        _roomVertexBuffer = new VertexBuffer(
+            GraphicsDevice,
+            typeof(VertexPositionColor),
+            vertices.Length,
+            BufferUsage.WriteOnly
+        );
+        _roomVertexBuffer.SetData(vertices);
+
+        ushort[] indices = new ushort[36];
+        for (int face = 0; face < 6; face++)
         {
-            // Un mesh puede tener mas de 1 mesh part (cada 1 puede tener su propio efecto).
-            foreach (var meshPart in mesh.MeshParts)
-            {
-                meshPart.Effect = _effect;
-            }
+            int v = face * 4;
+            int i = face * 6;
+
+            indices[i + 0] = (ushort)(v + 0);
+            indices[i + 1] = (ushort)(v + 1);
+            indices[i + 2] = (ushort)(v + 2);
+            indices[i + 3] = (ushort)(v + 0);
+            indices[i + 4] = (ushort)(v + 2);
+            indices[i + 5] = (ushort)(v + 3);
         }
+
+        _roomIndexBuffer = new IndexBuffer(
+            GraphicsDevice,
+            IndexElementSize.SixteenBits,
+            indices.Length,
+            BufferUsage.WriteOnly
+        );
+        _roomIndexBuffer.SetData(indices);
+
+        base.LoadContent();
 
         base.LoadContent();
     }
@@ -110,19 +144,28 @@ public class TGCGame : Game
     /// </summary>
     protected override void Update(GameTime gameTime)
     {
-        // Aca deberiamos poner toda la logica de actualizacion del juego.
-
-        // Capturar Input teclado
         if (Keyboard.GetState().IsKeyDown(Keys.Escape))
-        {
-            //Salgo del juego.
             Exit();
-        }
 
-        // Basado en el tiempo que paso se va generando una rotacion.
-        _rotation += Convert.ToSingle(gameTime.ElapsedGameTime.TotalSeconds);
+        float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        var keyboardState = Keyboard.GetState();
 
-        _world = Matrix.CreateRotationY(_rotation);
+        float moveSpeed = 100f;
+        float turnSpeed = 2f;
+
+        if (keyboardState.IsKeyDown(Keys.Left)) _playerRotation += turnSpeed * elapsedTime;
+        if (keyboardState.IsKeyDown(Keys.Right)) _playerRotation -= turnSpeed * elapsedTime;
+
+        Vector3 forward = Vector3.Transform(Vector3.Forward, Matrix.CreateRotationY(_playerRotation));
+        Vector3 right = Vector3.Cross(forward, Vector3.Up);
+
+        if (keyboardState.IsKeyDown(Keys.W)) _cameraPosition += forward * moveSpeed * elapsedTime;
+        if (keyboardState.IsKeyDown(Keys.S)) _cameraPosition -= forward * moveSpeed * elapsedTime;
+        if (keyboardState.IsKeyDown(Keys.A)) _cameraPosition -= right * moveSpeed * elapsedTime;
+        if (keyboardState.IsKeyDown(Keys.D)) _cameraPosition += right * moveSpeed * elapsedTime;
+
+        _cameraPosition.Y = 30f;
+        UpdateViewMatrix();
 
         base.Update(gameTime);
     }
@@ -133,19 +176,35 @@ public class TGCGame : Game
     /// </summary>
     protected override void Draw(GameTime gameTime)
     {
-        // Aca deberiamos poner toda la logia de renderizado del juego.
         GraphicsDevice.Clear(Color.Black);
 
-        // Para dibujar le modelo necesitamos pasarle informacion que el efecto esta esperando.
-        _effect.Parameters["View"].SetValue(_view);
-        _effect.Parameters["Projection"].SetValue(_projection);
-        _effect.Parameters["DiffuseColor"].SetValue(Color.DarkBlue.ToVector3());
+        if (_effect == null || _roomVertexBuffer == null || _roomIndexBuffer == null)
+            return;
 
-        foreach (var mesh in _model.Meshes)
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+        GraphicsDevice.BlendState = BlendState.Opaque;
+        GraphicsDevice.RasterizerState = new RasterizerState { CullMode = CullMode.None };
+
+        GraphicsDevice.SetVertexBuffer(_roomVertexBuffer);
+        GraphicsDevice.Indices = _roomIndexBuffer;
+
+        _effect.Parameters["World"]?.SetValue(_world);
+        _effect.Parameters["View"]?.SetValue(_view);
+        _effect.Parameters["Projection"]?.SetValue(_projection);
+        _effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
+
+        foreach (var pass in _effect.CurrentTechnique.Passes)
         {
-            _effect.Parameters["World"].SetValue(mesh.ParentBone.Transform * _world);
-            mesh.Draw();
+            pass.Apply();
+            GraphicsDevice.DrawIndexedPrimitives(
+                PrimitiveType.TriangleList,
+                0,
+                0,
+                primitiveCount: 12
+            );
         }
+
+        base.Draw(gameTime);
     }
 
     /// <summary>
@@ -157,5 +216,11 @@ public class TGCGame : Game
         Content.Unload();
 
         base.UnloadContent();
+    }
+
+    private void UpdateViewMatrix()
+    {
+        Vector3 forward = Vector3.Transform(Vector3.Forward, Matrix.CreateRotationY(_playerRotation));
+        _view = Matrix.CreateLookAt(_cameraPosition, _cameraPosition + forward, Vector3.Up);
     }
 }
