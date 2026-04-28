@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System.Collections.Generic;
 using TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives;
 
 namespace TGC.MonoGame.TP;
@@ -30,6 +31,7 @@ public class TGCGame : Game
     private Matrix _projection;
 
     private Effect _effect;
+    private List<Matrix> _roomWorlds = new();
 
     private VertexBuffer _roomVertexBuffer;
     private IndexBuffer _roomIndexBuffer;
@@ -99,39 +101,39 @@ public class TGCGame : Game
 
         // Creo el cuarto
         var room = new Room();
-        VertexPositionColor[] vertices = room.CreateRoom(width: 150f, height: 120f, depth: 150f);
+        var roomMesh = room.CreateRoom(
+            width: 150f,
+            height: 120f,
+            depth: 150f,
+            floorColor: Color.LightYellow,
+            ceilingColor: Color.Yellow,
+            frontWallColor: Color.Red,
+            backWallColor: Color.Pink,
+            leftWallColor: Color.Green,
+            rightWallColor: Color.Blue
+        );
 
         _roomVertexBuffer = new VertexBuffer(
             GraphicsDevice,
             typeof(VertexPositionColor),
-            vertices.Length,
+            roomMesh.Vertices.Length,
             BufferUsage.WriteOnly
         );
-        _roomVertexBuffer.SetData(vertices);
-
-        ushort[] indices = new ushort[36];
-        for (int face = 0; face < 6; face++)
-        {
-            int v = face * 4;
-            int i = face * 6;
-
-            indices[i + 0] = (ushort)(v + 0);
-            indices[i + 1] = (ushort)(v + 1);
-            indices[i + 2] = (ushort)(v + 2);
-            indices[i + 3] = (ushort)(v + 0);
-            indices[i + 4] = (ushort)(v + 2);
-            indices[i + 5] = (ushort)(v + 3);
-        }
+        _roomVertexBuffer.SetData(roomMesh.Vertices);
 
         _roomIndexBuffer = new IndexBuffer(
             GraphicsDevice,
             IndexElementSize.SixteenBits,
-            indices.Length,
+            roomMesh.Indices.Length,
             BufferUsage.WriteOnly
         );
-        _roomIndexBuffer.SetData(indices);
+        _roomIndexBuffer.SetData(roomMesh.Indices);
 
-        base.LoadContent();
+        // Muchas habitaciones en distintos lugares
+        _roomWorlds.Add(Matrix.CreateTranslation(0, 0, 0));
+        _roomWorlds.Add(Matrix.CreateTranslation(320, 0, 0));
+        _roomWorlds.Add(Matrix.CreateTranslation(640, 0, 0));
+        _roomWorlds.Add(Matrix.CreateTranslation(960, 0, 0));
 
         base.LoadContent();
     }
@@ -186,22 +188,26 @@ public class TGCGame : Game
 
         GraphicsDevice.SetVertexBuffer(_roomVertexBuffer);
         GraphicsDevice.Indices = _roomIndexBuffer;
-
-        _effect.Parameters["World"]?.SetValue(_world);
+        
         _effect.Parameters["View"]?.SetValue(_view);
         _effect.Parameters["Projection"]?.SetValue(_projection);
         _effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
 
-        foreach (var pass in _effect.CurrentTechnique.Passes)
+        foreach (var world in _roomWorlds)
         {
-            pass.Apply();
-            GraphicsDevice.DrawIndexedPrimitives(
-                PrimitiveType.TriangleList,
-                0,
-                0,
-                primitiveCount: 12
-            );
-        }
+            _effect.Parameters["World"]?.SetValue(world);
+
+            foreach (var pass in _effect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
+                GraphicsDevice.DrawIndexedPrimitives(
+                    PrimitiveType.TriangleList,
+                    0,
+                    0,
+                    primitiveCount: 12
+                );
+            }
+        }        
 
         base.Draw(gameTime);
     }
