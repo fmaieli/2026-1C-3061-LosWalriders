@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using BepuPhysics.Collidables;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Collections.Generic;
@@ -21,9 +22,7 @@ public class TGCGame : Game
     public const string ContentFolderTextures = "Textures/";
 
     private readonly GraphicsDeviceManager _graphics;
-    
-    private Model _model;    
-    private float _rotation;
+
     private SpriteBatch _spriteBatch;
 
     private Matrix _view;
@@ -36,8 +35,10 @@ public class TGCGame : Game
     private VertexBuffer _roomVertexBuffer;
     private IndexBuffer _roomIndexBuffer;
 
-    private Vector3 _cameraPosition = new Vector3(0, 30, 150);
+    private Vector3 _cameraPosition = new Vector3(0, 50, 150);
     private float _playerRotation = 0f;
+
+    private readonly List<(Model Model, Matrix World)> _models = new();
 
     /// <summary>
     ///     Constructor del juego.
@@ -77,7 +78,7 @@ public class TGCGame : Game
         _world = Matrix.Identity;
         _view = Matrix.CreateLookAt(Vector3.UnitZ * 150, Vector3.Zero, Vector3.Up);
         _projection =
-            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 500);
+            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 1500);
 
         base.Initialize();
     }
@@ -92,9 +93,6 @@ public class TGCGame : Game
         // Aca es donde deberiamos cargar todos los contenido necesarios antes de iniciar el juego.
         _spriteBatch = new SpriteBatch(GraphicsDevice);
 
-        // Cargo el modelo del logo.
-        //_model = Content.Load<Model>(ContentFolder3D + "tgc-logo/tgc-logo");
-
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
@@ -105,7 +103,7 @@ public class TGCGame : Game
             width: 150f,
             height: 120f,
             depth: 150f,
-            floorColor: Color.LightYellow,
+            floorColor: Color.Black,
             ceilingColor: Color.Yellow,
             frontWallColor: Color.Red,
             backWallColor: Color.Pink,
@@ -129,11 +127,75 @@ public class TGCGame : Game
         );
         _roomIndexBuffer.SetData(roomMesh.Indices);
 
-        // Muchas habitaciones en distintos lugares
+        // Varias habitaciones en distintas posiciones
         _roomWorlds.Add(Matrix.CreateTranslation(0, 0, 0));
         _roomWorlds.Add(Matrix.CreateTranslation(320, 0, 0));
         _roomWorlds.Add(Matrix.CreateTranslation(640, 0, 0));
         _roomWorlds.Add(Matrix.CreateTranslation(960, 0, 0));
+
+        var modelPaths = new[]
+        {
+            "Items/PSX_Door",
+            "Items/PSX_Nokia",
+
+            "Level/Bathroom/PSX_Toilet_Paper",
+            "Level/Bathroom/PSX_Toilet",
+
+            "Level/Bedroom/PSX_Bed",
+            "Level/Bedroom/PSX_Lamp",
+            "Level/Bedroom/PSX_Wooden_Closet",
+            "Level/Bedroom/PSX_Wooden_Drawers",
+
+            "Level/Computer/PSX_Computer_Chair",
+            "Level/Computer/PSX_Dirty_Old_PC",
+
+            "Level/Kitchen/PSX_Empty_Cup",
+            "Level/Kitchen/PSX_Microwave",
+            "Level/Kitchen/PSX_Plate",
+            "Level/Kitchen/PSX_Plate1",
+            "Level/Kitchen/PSX_Stockpot",
+            "Level/Kitchen/PSX_Wooden_Table1",
+
+            "Level/Living/PSX_Armchair",
+            "Level/Living/PSX_Old_TV",
+            "Level/Living/PSX_PlayStation1",
+            "Level/Living/PSX_TV_Stand",
+            "Level/Living/PSX_Wooden_Chair",
+            "Level/Living/PSX_Wooden_Chair1",
+            "Level/Living/PSX_Wooden_Chair2",
+            "Level/Living/PSX_Wooden_Table",
+
+            "Level/Outdoor/Grass",
+            "Level/Outdoor/LowPoly_Grass",
+            "Level/Outdoor/LowPoly_Tree",
+            "Level/Outdoor/PSX_Bush",
+            "Level/Outdoor/PSX_Bush2",
+            "Level/Outdoor/PSX_Bush3",
+            "Level/Outdoor/PSX_Fence_White_Gate_Poles",
+            "Level/Outdoor/PSX_Fence_White_Gate",
+            "Level/Outdoor/PSX_Fence_White_Left_Closed",
+            "Level/Outdoor/PSX_Fence_White_Left_Open",
+            "Level/Outdoor/PSX_Fence_White_Right_Closed",
+            "Level/Outdoor/PSX_Fence_White_Right_Open",
+            "Level/Outdoor/PSX_Fence_White_Right_Pole",
+
+            "Miscellaneous/PSX_Bloody_Cleaver_Knife",
+            "Miscellaneous/PSX_Bloody_Fire_Axe",
+            "Miscellaneous/PSX_Paper_Stack",
+            "Miscellaneous/PSX_Rusty_Barell",
+            "Miscellaneous/PSX_Wooden_Barrel"
+        };
+
+        float modelSpacing = 150f;
+        Vector3 modelsStart = new Vector3(0, 0, -400);
+
+        for (int i = 0; i < modelPaths.Length; i++)
+        {
+            var model = Content.Load<Model>(ContentFolder3D + modelPaths[i]);
+            //ApplyCustomEffectToModel(model, _effect);
+            var world = Matrix.CreateScale(1f) * Matrix.CreateTranslation(modelsStart + new Vector3(i * modelSpacing, 0, 0));
+            _models.Add((model, world));
+        }
 
         base.LoadContent();
     }
@@ -150,9 +212,10 @@ public class TGCGame : Game
 
         float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         var keyboardState = Keyboard.GetState();
+        var mouseState = Mouse.GetState();
 
-        float moveSpeed = 100f;
-        float turnSpeed = 2f;
+        float moveSpeed = 200f;
+        float turnSpeed = 3f;
 
         if (keyboardState.IsKeyDown(Keys.Left)) _playerRotation += turnSpeed * elapsedTime;
         if (keyboardState.IsKeyDown(Keys.Right)) _playerRotation -= turnSpeed * elapsedTime;
@@ -165,7 +228,7 @@ public class TGCGame : Game
         if (keyboardState.IsKeyDown(Keys.A)) _cameraPosition -= right * moveSpeed * elapsedTime;
         if (keyboardState.IsKeyDown(Keys.D)) _cameraPosition += right * moveSpeed * elapsedTime;
 
-        _cameraPosition.Y = 30f;
+        _cameraPosition.Y = 50f;
         UpdateViewMatrix();
 
         base.Update(gameTime);
@@ -177,7 +240,7 @@ public class TGCGame : Game
     /// </summary>
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(Color.Black);
+        GraphicsDevice.Clear(Color.White);
 
         if (_effect == null || _roomVertexBuffer == null || _roomIndexBuffer == null)
             return;
@@ -188,7 +251,7 @@ public class TGCGame : Game
 
         GraphicsDevice.SetVertexBuffer(_roomVertexBuffer);
         GraphicsDevice.Indices = _roomIndexBuffer;
-        
+
         _effect.Parameters["View"]?.SetValue(_view);
         _effect.Parameters["Projection"]?.SetValue(_projection);
         _effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
@@ -207,9 +270,60 @@ public class TGCGame : Game
                     primitiveCount: 12
                 );
             }
-        }        
+        }
+
+        foreach (var (model, world) in _models)
+        {
+            DrawModelWithBasicEffect(model, world);
+            //DrawModelWithCustomEffect(model, world);
+        }
 
         base.Draw(gameTime);
+    }
+
+    private void ApplyCustomEffectToModel(Model model, Effect effectTemplate)
+    {
+        foreach (var mesh in model.Meshes)
+        {
+            foreach (var part in mesh.MeshParts)
+            {
+                part.Effect = effectTemplate.Clone();
+            }
+        }
+    }
+
+    private void DrawModelWithCustomEffect(Model model, Matrix world)
+    {
+        foreach (var mesh in model.Meshes)
+        {
+            foreach (var part in mesh.MeshParts)
+            {
+                var effect = (Effect)part.Effect;
+                effect.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * world);
+                effect.Parameters["View"]?.SetValue(_view);
+                effect.Parameters["Projection"]?.SetValue(_projection);
+                effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
+            }
+
+            mesh.Draw();
+        }
+    }
+
+    private void DrawModelWithBasicEffect(Model model, Matrix world)
+    {
+        foreach (ModelMesh mesh in model.Meshes)
+        {
+            foreach (BasicEffect effect in mesh.Effects)
+            {
+                effect.World = mesh.ParentBone.Transform * world;
+                effect.View = _view;
+                effect.Projection = _projection;
+                effect.EnableDefaultLighting();
+                effect.PreferPerPixelLighting = true;
+            }
+
+            mesh.Draw();
+        }
     }
 
     /// <summary>
