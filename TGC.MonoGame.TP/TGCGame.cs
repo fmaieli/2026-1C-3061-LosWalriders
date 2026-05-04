@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Collections.Generic;
 using TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives;
+using TGC.MonoGame.TP.SourceCode.Helpers;
 
 namespace TGC.MonoGame.TP;
 
@@ -193,11 +194,10 @@ public class TGCGame : Game
         for (int i = 0; i < modelPaths.Length; i++)
         {
             var model = Content.Load<Model>(ContentFolder3D + modelPaths[i]);
-            //ApplyCustomEffectToModel(model, _effect);
+            ApplyCustomEffectToModel(model, _effect);
             var world = Matrix.CreateScale(1f) * Matrix.CreateTranslation(modelsStart + new Vector3(i * modelSpacing, 0, 0));
             _models.Add((model, world, modelPaths[i]));
         }
-
 
         base.LoadContent();
     }
@@ -260,6 +260,7 @@ public class TGCGame : Game
 
         _effect.Parameters["View"]?.SetValue(_view);
         _effect.Parameters["Projection"]?.SetValue(_projection);
+        _effect.Parameters["UseVertexColor"]?.SetValue(true);
         _effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
 
         foreach (var world in _roomWorlds)
@@ -280,8 +281,7 @@ public class TGCGame : Game
 
         foreach (var (model, world, name) in _models)
         {
-            DrawModelWithBasicEffect(model, world, name);
-            //DrawModelWithCustomEffect(model, world);
+            DrawModelWithCustomEffect(model, world, name);
         }
 
         base.Draw(gameTime);
@@ -298,70 +298,25 @@ public class TGCGame : Game
         }
     }
 
-    private void DrawModelWithCustomEffect(Model model, Matrix world)
+    private void DrawModelWithCustomEffect(Model model, Matrix world, string modelName)
     {
+        Vector3 tint = ModelTintHelper.GetTint(modelName).ToVector3();
+
         foreach (var mesh in model.Meshes)
         {
             foreach (var part in mesh.MeshParts)
             {
                 var effect = (Effect)part.Effect;
+
                 effect.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * world);
                 effect.Parameters["View"]?.SetValue(_view);
                 effect.Parameters["Projection"]?.SetValue(_projection);
-                effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
+                effect.Parameters["UseVertexColor"]?.SetValue(false);
+                effect.Parameters["DiffuseColor"]?.SetValue(tint);
             }
 
             mesh.Draw();
         }
-    }
-
-    private void DrawModelWithBasicEffect(Model model, Matrix world, string modelName)
-    {
-        bool isCutout =
-            modelName.StartsWith("Level/Outdoor/") &&
-            (modelName.Contains("Grass") ||
-             modelName.Contains("Bush") ||
-             modelName.Contains("Fence") ||
-             modelName.Contains("Tree"));
-
-        bool needsStraightAlpha =
-            modelName == "Level/Bedroom/PSX_Wooden_Drawers" ||
-            modelName == "Level/Living/PSX_Wooden_Chair2";
-
-        bool isSolidColorGrass =
-            modelName == "Level/Outdoor/LowPoly_Grass";
-
-        foreach (ModelMesh mesh in model.Meshes)
-        {
-            foreach (BasicEffect effect in mesh.Effects)
-            {
-                effect.World = mesh.ParentBone.Transform * world;
-                effect.View = _view;
-                effect.Projection = _projection;
-
-                bool hasTexture = effect.Texture != null;
-
-                effect.TextureEnabled = hasTexture;
-                effect.DiffuseColor = isSolidColorGrass ? new Vector3(0.15f, 0.5f, 0.15f) : Vector3.One;
-                effect.AmbientLightColor = Vector3.One;
-                effect.EmissiveColor = Vector3.Zero;
-                effect.LightingEnabled = false;
-                effect.Alpha = 1f;
-            }
-
-            if (needsStraightAlpha)
-                GraphicsDevice.BlendState = BlendState.NonPremultiplied;
-            else if (isSolidColorGrass)
-                GraphicsDevice.BlendState = BlendState.Opaque;
-            else if (isCutout)
-                GraphicsDevice.BlendState = BlendState.NonPremultiplied;
-            else
-                GraphicsDevice.BlendState = BlendState.Opaque;
-
-            mesh.Draw();
-        }
-
-        GraphicsDevice.BlendState = BlendState.Opaque;
     }
 
     /// <summary>
@@ -371,7 +326,6 @@ public class TGCGame : Game
     {
         // Libero los recursos.
         Content.Unload();
-
         base.UnloadContent();
     }
 

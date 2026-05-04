@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Types
 {
-    internal class StudioRoom
+    internal class OutdoorRoom
     {
     }
 }
