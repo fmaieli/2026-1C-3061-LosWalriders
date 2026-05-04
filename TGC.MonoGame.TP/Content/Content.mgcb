@@ -527,7 +527,7 @@
 /processorParam:RotationZ=0
 /processorParam:Scale=1
 /processorParam:SwapWindingOrder=False
-/processorParam:TextureFormat=Compressed
+/processorParam:TextureFormat=Color
 /build:Models/Level/Outdoor/Grass.fbx;Models/Level/Outdoor/Grass
 
 #begin Models/Level/Outdoor/LowPoly_Grass.fbx
@@ -565,7 +565,7 @@
 /processorParam:RotationZ=0
 /processorParam:Scale=1
 /processorParam:SwapWindingOrder=False
-/processorParam:TextureFormat=Compressed
+/processorParam:TextureFormat=Color
 /build:Models/Level/Outdoor/LowPoly_Tree.fbx;Models/Level/Outdoor/LowPoly_Tree
 
 #begin Models/Level/Outdoor/PSX_Bush.fbx
@@ -813,7 +813,7 @@
 /processorParam:Scale=1
 /processorParam:SwapWindingOrder=False
 /processorParam:TextureFormat=Compressed
-/build:Models/Miscellaneous/PSX_Paper_Stack.fbx
+/build:Models/Miscellaneous/PSX_Paper_Stack.fbx;Models/Miscellaneous/PSX_Paper_Stack
 
 #begin Models/Miscellaneous/PSX_Rusty_Barell.fbx
 /importer:FbxImporter
@@ -870,7 +870,7 @@
 /processorParam:Scale=1
 /processorParam:SwapWindingOrder=False
 /processorParam:TextureFormat=Compressed
-/build:Models/Player/PSX_Player_Arms.fbx
+/build:Models/Player/PSX_Player_Arms.fbx;Models/Player/PSX_Player_Arms
 
 #begin Models/tgc-logo/tgc-logo.fbx
 /importer:FbxImporter
