@@ -38,7 +38,7 @@ public class TGCGame : Game
     private Vector3 _cameraPosition = new Vector3(0, 50, 150);
     private float _playerRotation = 0f;
 
-    private readonly List<(Model Model, Matrix World)> _models = new();
+    private readonly List<(Model Model, Matrix World, string Name)> _models = new();
 
     /// <summary>
     ///     Constructor del juego.
@@ -135,6 +135,7 @@ public class TGCGame : Game
 
         var modelPaths = new[]
         {
+            "Player/PSX_Player_Arms",
             "Items/PSX_Door",
             "Items/PSX_Nokia",
 
@@ -194,8 +195,9 @@ public class TGCGame : Game
             var model = Content.Load<Model>(ContentFolder3D + modelPaths[i]);
             //ApplyCustomEffectToModel(model, _effect);
             var world = Matrix.CreateScale(1f) * Matrix.CreateTranslation(modelsStart + new Vector3(i * modelSpacing, 0, 0));
-            _models.Add((model, world));
+            _models.Add((model, world, modelPaths[i]));
         }
+
 
         base.LoadContent();
     }
@@ -214,7 +216,7 @@ public class TGCGame : Game
         var keyboardState = Keyboard.GetState();
         var mouseState = Mouse.GetState();
 
-        float moveSpeed = 200f;
+        float moveSpeed = 300f;
         float turnSpeed = 3f;
 
         if (keyboardState.IsKeyDown(Keys.Left)) _playerRotation += turnSpeed * elapsedTime;
@@ -247,7 +249,11 @@ public class TGCGame : Game
 
         GraphicsDevice.DepthStencilState = DepthStencilState.Default;
         GraphicsDevice.BlendState = BlendState.Opaque;
-        GraphicsDevice.RasterizerState = new RasterizerState { CullMode = CullMode.None };
+        GraphicsDevice.RasterizerState = new RasterizerState
+        {
+            CullMode = CullMode.None,
+            //FillMode = FillMode.WireFrame
+        };
 
         GraphicsDevice.SetVertexBuffer(_roomVertexBuffer);
         GraphicsDevice.Indices = _roomIndexBuffer;
@@ -272,9 +278,9 @@ public class TGCGame : Game
             }
         }
 
-        foreach (var (model, world) in _models)
+        foreach (var (model, world, name) in _models)
         {
-            DrawModelWithBasicEffect(model, world);
+            DrawModelWithBasicEffect(model, world, name);
             //DrawModelWithCustomEffect(model, world);
         }
 
@@ -309,8 +315,22 @@ public class TGCGame : Game
         }
     }
 
-    private void DrawModelWithBasicEffect(Model model, Matrix world)
+    private void DrawModelWithBasicEffect(Model model, Matrix world, string modelName)
     {
+        bool isCutout =
+            modelName.StartsWith("Level/Outdoor/") &&
+            (modelName.Contains("Grass") ||
+             modelName.Contains("Bush") ||
+             modelName.Contains("Fence") ||
+             modelName.Contains("Tree"));
+
+        bool needsStraightAlpha =
+            modelName == "Level/Bedroom/PSX_Wooden_Drawers" ||
+            modelName == "Level/Living/PSX_Wooden_Chair2";
+
+        bool isSolidColorGrass =
+            modelName == "Level/Outdoor/LowPoly_Grass";
+
         foreach (ModelMesh mesh in model.Meshes)
         {
             foreach (BasicEffect effect in mesh.Effects)
@@ -318,12 +338,30 @@ public class TGCGame : Game
                 effect.World = mesh.ParentBone.Transform * world;
                 effect.View = _view;
                 effect.Projection = _projection;
-                effect.EnableDefaultLighting();
-                effect.PreferPerPixelLighting = true;
+
+                bool hasTexture = effect.Texture != null;
+
+                effect.TextureEnabled = hasTexture;
+                effect.DiffuseColor = isSolidColorGrass ? new Vector3(0.15f, 0.5f, 0.15f) : Vector3.One;
+                effect.AmbientLightColor = Vector3.One;
+                effect.EmissiveColor = Vector3.Zero;
+                effect.LightingEnabled = false;
+                effect.Alpha = 1f;
             }
+
+            if (needsStraightAlpha)
+                GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+            else if (isSolidColorGrass)
+                GraphicsDevice.BlendState = BlendState.Opaque;
+            else if (isCutout)
+                GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+            else
+                GraphicsDevice.BlendState = BlendState.Opaque;
 
             mesh.Draw();
         }
+
+        GraphicsDevice.BlendState = BlendState.Opaque;
     }
 
     /// <summary>
