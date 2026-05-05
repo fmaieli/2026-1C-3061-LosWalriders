@@ -7,6 +7,7 @@
         Computer,
         Kitchen,
         Living,
-        Outdoor
+        Outdoor,
+        Hallway
     }
 }
