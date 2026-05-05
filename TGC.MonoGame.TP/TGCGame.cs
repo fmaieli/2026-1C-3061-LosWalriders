@@ -1,10 +1,13 @@
-﻿using BepuPhysics.Collidables;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
 using System.Collections.Generic;
 using TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives;
+using TGC.MonoGame.TP.SourceCode.Enums;
+using TGC.MonoGame.TP.SourceCode.Factories;
 using TGC.MonoGame.TP.SourceCode.Helpers;
+using TGC.MonoGame.TP.SourceCode.Interfaces;
 
 namespace TGC.MonoGame.TP;
 
@@ -31,11 +34,8 @@ public class TGCGame : Game
     private Matrix _projection;
 
     private Effect _effect;
-    private List<Matrix> _roomWorlds = new();
-
-    private VertexBuffer _roomVertexBuffer;
-    private IndexBuffer _roomIndexBuffer;
-    private int _roomPrimitiveCount;            // Cantidad total de triangulos, cada 3 debe de ser un triangulo
+    private readonly List<(VertexBuffer VertexBuffer, IndexBuffer IndexBuffer, int PrimitiveCount, Matrix World)> _rooms = new();
+    private readonly Dictionary<string, Model> _modelCache = new();
 
     private Vector3 _cameraPosition = new Vector3(0, 50, 150);
     private float _playerRotation = 0f;
@@ -99,115 +99,115 @@ public class TGCGame : Game
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
 
-        // Creo el cuarto
-        var room = new Room();
-        var roomMesh = room.CreateRoom(
-            width: 150f,
-            height: 120f,
-            depth: 150f,
-            floorColor: Color.Black,
-            ceilingColor: Color.Yellow,
-            frontWallColor: Color.Red,
-            backWallColor: Color.Pink,
-            leftWallColor: Color.Green,
-            rightWallColor: Color.Blue,
-            frontOpening: WallOpening.Door(40f, 80f),
-            backOpening: WallOpening.Solid(),
-            leftOpening: WallOpening.Window(50f, 30f),
-            rightOpening: WallOpening.Window(60f, 30f)
-        );
+        // Creo una matriz de 3x3 con habitaciones
+        // Dimensiones elegidas para todas las habitaciones
+        float roomWidth = 150f;
+        float roomHeight = 120f;
+        float roomDepth = 150f;
 
-        // Centro para los openings
-        List<Vector3> centers = room.OpeningCenters;
+        float roomGap = 1f;   // Distancia entre las habitaciones para que no haya bleeding
+        float cellSize = 30f; // Tamaño de cada celda definido arbitrariamente para todas las habitaciones
 
-        _roomVertexBuffer = new VertexBuffer(
-            GraphicsDevice,
-            typeof(VertexPositionColor),
-            roomMesh.Vertices.Length,
-            BufferUsage.WriteOnly
-        );
-        _roomVertexBuffer.SetData(roomMesh.Vertices);
+        // Tamaño de las aberturas
+        var door = WallOpening.Door(40f, 80f);
+        var window = WallOpening.Window(50f, 30f);
+        var solid = WallOpening.Solid();
 
-        _roomIndexBuffer = new IndexBuffer(
-            GraphicsDevice,
-            IndexElementSize.SixteenBits,
-            roomMesh.Indices.Length,
-            BufferUsage.WriteOnly
-        );
-        _roomIndexBuffer.SetData(roomMesh.Indices);
-
-        _roomPrimitiveCount = roomMesh.Indices.Length / 3;
-
-        // Varias habitaciones en distintas posiciones
-        _roomWorlds.Add(Matrix.CreateTranslation(0, 0, 0));
-        _roomWorlds.Add(Matrix.CreateTranslation(320, 0, 0));
-        _roomWorlds.Add(Matrix.CreateTranslation(640, 0, 0));
-        _roomWorlds.Add(Matrix.CreateTranslation(960, 0, 0));
-
-        var modelPaths = new[]
+        var grid = new[]
         {
-            "Player/PSX_Player_Arms",
-            "Items/PSX_Door",
-            "Items/PSX_Nokia",
-
-            "Level/Bathroom/PSX_Toilet_Paper",
-            "Level/Bathroom/PSX_Toilet",
-
-            "Level/Bedroom/PSX_Bed",
-            "Level/Bedroom/PSX_Lamp",
-            "Level/Bedroom/PSX_Wooden_Closet",
-            "Level/Bedroom/PSX_Wooden_Drawers",
-
-            "Level/Computer/PSX_Computer_Chair",
-            "Level/Computer/PSX_Dirty_Old_PC",
-
-            "Level/Kitchen/PSX_Empty_Cup",
-            "Level/Kitchen/PSX_Microwave",
-            "Level/Kitchen/PSX_Plate",
-            "Level/Kitchen/PSX_Plate1",
-            "Level/Kitchen/PSX_Stockpot",
-            "Level/Kitchen/PSX_Wooden_Table1",
-
-            "Level/Living/PSX_Armchair",
-            "Level/Living/PSX_Old_TV",
-            "Level/Living/PSX_PlayStation1",
-            "Level/Living/PSX_TV_Stand",
-            "Level/Living/PSX_Wooden_Chair",
-            "Level/Living/PSX_Wooden_Chair1",
-            "Level/Living/PSX_Wooden_Chair2",
-            "Level/Living/PSX_Wooden_Table",
-
-            "Level/Outdoor/Grass",
-            "Level/Outdoor/LowPoly_Grass",
-            "Level/Outdoor/LowPoly_Tree",
-            "Level/Outdoor/PSX_Bush",
-            "Level/Outdoor/PSX_Bush2",
-            "Level/Outdoor/PSX_Bush3",
-            "Level/Outdoor/PSX_Fence_White_Gate_Poles",
-            "Level/Outdoor/PSX_Fence_White_Gate",
-            "Level/Outdoor/PSX_Fence_White_Left_Closed",
-            "Level/Outdoor/PSX_Fence_White_Left_Open",
-            "Level/Outdoor/PSX_Fence_White_Right_Closed",
-            "Level/Outdoor/PSX_Fence_White_Right_Open",
-            "Level/Outdoor/PSX_Fence_White_Right_Pole",
-
-            "Miscellaneous/PSX_Bloody_Cleaver_Knife",
-            "Miscellaneous/PSX_Bloody_Fire_Axe",
-            "Miscellaneous/PSX_Paper_Stack",
-            "Miscellaneous/PSX_Rusty_Barell",
-            "Miscellaneous/PSX_Wooden_Barrel"
+            // Row Z = 0
+            new[]
+            {
+                (RoomType.Bed,     front: door, back: solid, left: window, right: door),
+                (RoomType.Kitchen, front: door, back: window, left: door,   right: door),
+                (RoomType.Bed,     front: door, back: solid, left: door,   right: window),
+            },
+            // Row Z = 1
+            new[]
+            {
+                (RoomType.Living,  front: door, back: door,  left: window, right: door),
+                (RoomType.Hallway, front: door, back: door,  left: door,   right: door),
+                (RoomType.Bath,    front: door, back: door,  left: door,   right: window),
+            },
+            // Row Z = 2
+            new[]
+            {
+                (RoomType.Computer, front: solid, back: door, left: window, right: door),
+                (RoomType.Outdoor,  front: window, back: door, left: door, right: door),
+                (RoomType.Bed,      front: solid, back: door, left: door, right: window),
+            }
         };
 
-        float modelSpacing = 150f;
-        Vector3 modelsStart = new Vector3(0, 0, -400);
+        var rng = new Random(); // Semilla random para que los elementos se muestren de forma aleatoria cada vez que se genera
 
-        for (int i = 0; i < modelPaths.Length; i++)
+        for (int z = 0; z < 3; z++)
         {
-            var model = Content.Load<Model>(ContentFolder3D + modelPaths[i]);
-            ApplyCustomEffectToModel(model, _effect);
-            var world = Matrix.CreateScale(1f) * Matrix.CreateTranslation(modelsStart + new Vector3(i * modelSpacing, 0, 0));
-            _models.Add((model, world, modelPaths[i]));
+            for (int x = 0; x < 3; x++)
+            {
+                var roomDefinition = grid[z][x]; // Tupla de 5 elementos
+
+                var room = new Room();
+                var mesh = room.CreateRoom(
+                    width: roomWidth,
+                    height: roomHeight,
+                    depth: roomDepth,
+                    floorColor: Color.Black,
+                    ceilingColor: Color.Yellow,
+                    frontWallColor: Color.Red,
+                    backWallColor: Color.Pink,
+                    leftWallColor: Color.Green,
+                    rightWallColor: Color.Blue,
+                    frontOpening: roomDefinition.front,
+                    backOpening: roomDefinition.back,
+                    leftOpening: roomDefinition.left,
+                    rightOpening: roomDefinition.right
+                );
+
+                var vertexBuffer = new VertexBuffer(GraphicsDevice, typeof(VertexPositionColor), mesh.Vertices.Length, BufferUsage.WriteOnly);
+                vertexBuffer.SetData(mesh.Vertices);
+
+                var indexBuffer = new IndexBuffer(GraphicsDevice, IndexElementSize.SixteenBits, mesh.Indices.Length, BufferUsage.WriteOnly);
+                indexBuffer.SetData(mesh.Indices);
+
+                int primCount = mesh.Indices.Length / 3;
+
+                float worldX = x * (roomWidth * 2f + roomGap);
+                float worldZ = z * (roomDepth * 2f + roomGap);
+                var roomWorld = Matrix.CreateTranslation(worldX, 0f, worldZ); // Muevo la habitacion al lugar donde debera de quedar
+
+                _rooms.Add((vertexBuffer, indexBuffer, primCount, roomWorld)); // Agrego la informacion de cada habitacion en la variable global _rooms
+
+                // Renderizado de modelos por habitacion
+                IRoomAssets roomTypeInstance = RoomFactory.Create(roomDefinition.Item1);
+                if (roomTypeInstance != null)
+                {
+                    var placements = ModelPlacementOnRoomHelper.GeneratePlacements(
+                        roomTypeInstance,
+                        roomWidth,
+                        roomDepth,
+                        cellSize,
+                        seed: rng.Next()
+                    );
+
+                    foreach (var (modelPath, localPos) in placements)
+                    {
+                        // Utilizo el diccionario para poder reutilizar elementos que ya se hayan guardado
+                        if (!_modelCache.TryGetValue(modelPath, out var model))
+                        {
+                            model = Content.Load<Model>(ContentFolder3D + modelPath);
+                            ApplyCustomEffectToModel(model, _effect);
+                            _modelCache[modelPath] = model;
+                        }
+
+                        // Posicion final de los modelos / Se achican a la mitad los modelos porque muchos son realmente grandes
+                        var modelWorld = Matrix.CreateScale(0.5f) * Matrix.CreateTranslation(roomWorld.Translation + localPos);
+                        _models.Add((model, modelWorld, modelPath));
+                    }
+                }
+            }
         }
+
+        Window.Title = $"TGC.MonoGame.TP - Models: {_models.Count}";
 
         base.LoadContent();
     }
@@ -254,7 +254,8 @@ public class TGCGame : Game
     {
         GraphicsDevice.Clear(Color.White);
 
-        if (_effect == null || _roomVertexBuffer == null || _roomIndexBuffer == null)
+        // Ya no se fija en VertexBuffer y IndexBuffer sino en la cantidad de habitaciones que existan
+        if (_effect == null || _rooms.Count == 0)
             return;
 
         GraphicsDevice.DepthStencilState = DepthStencilState.Default;
@@ -265,17 +266,16 @@ public class TGCGame : Game
             //FillMode = FillMode.WireFrame
         };
 
-        GraphicsDevice.SetVertexBuffer(_roomVertexBuffer);
-        GraphicsDevice.Indices = _roomIndexBuffer;
-
         _effect.Parameters["View"]?.SetValue(_view);
         _effect.Parameters["Projection"]?.SetValue(_projection);
         _effect.Parameters["UseVertexColor"]?.SetValue(true);
         _effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
 
-        foreach (var world in _roomWorlds)
+        foreach (var room in _rooms)
         {
-            _effect.Parameters["World"]?.SetValue(world);
+            GraphicsDevice.SetVertexBuffer(room.VertexBuffer);
+            GraphicsDevice.Indices = room.IndexBuffer;
+            _effect.Parameters["World"]?.SetValue(room.World);
 
             foreach (var pass in _effect.CurrentTechnique.Passes)
             {
@@ -284,7 +284,7 @@ public class TGCGame : Game
                     PrimitiveType.TriangleList,
                     0,
                     0,
-                    primitiveCount: _roomPrimitiveCount
+                    room.PrimitiveCount // Utilizo las primitivas guardadas LoadContent para dibujar las habitaciones
                 );
             }
         }
@@ -297,6 +297,11 @@ public class TGCGame : Game
         base.Draw(gameTime);
     }
 
+    /// <summary>
+    /// Reemplao el material por defecto de los modelos con un material personalizado
+    /// </summary>
+    /// <param name="model"></param>
+    /// <param name="effectTemplate"></param>
     private void ApplyCustomEffectToModel(Model model, Effect effectTemplate)
     {
         foreach (var mesh in model.Meshes)
