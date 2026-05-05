@@ -18,22 +18,24 @@ float4x4 View;
 float4x4 Projection;
 
 float3 DiffuseColor;
-
+bool UseVertexColor = true; // Variable creada para poder pintar los modelos que tienen ya vertex color
 float Time = 0;
 
 struct VertexShaderInput
 {
 	float4 Position : POSITION0;
+	float4 Color	: COLOR0;
 };
 
 struct VertexShaderOutput
 {
 	float4 Position : SV_POSITION;
+	float4 Color    : COLOR0;
 };
 
 VertexShaderOutput MainVS(in VertexShaderInput input)
 {
-    // Clear the output
+	// Clear the output
 	VertexShaderOutput output = (VertexShaderOutput)0;
     // Model space to World space
     float4 worldPosition = mul(input.Position, World);
@@ -41,13 +43,17 @@ VertexShaderOutput MainVS(in VertexShaderInput input)
     float4 viewPosition = mul(worldPosition, View);	
 	// View space to Projection space
     output.Position = mul(viewPosition, Projection);
+	
+	output.Color = (input.Color.a == 0) ? float4(1,1,1,1) : input.Color;
 
-    return output;
+	return output;
 }
 
-float4 MainPS(VertexShaderOutput input) : COLOR
+float4 MainPS(VertexShaderOutput input) : COLOR0
 {
-    return float4(DiffuseColor, 1.0);
+	// Esta logica existe para poder seguir utilizando los vertex color dentro de las habitaciones
+	float3 baseColor = UseVertexColor ? input.Color.rgb : float3(1,1,1);
+	return float4(baseColor * DiffuseColor, 1.0f);
 }
 
 technique BasicColorDrawing
