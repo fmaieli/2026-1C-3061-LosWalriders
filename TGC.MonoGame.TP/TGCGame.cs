@@ -35,7 +35,7 @@ public class TGCGame : Game
 
     private VertexBuffer _roomVertexBuffer;
     private IndexBuffer _roomIndexBuffer;
-    private int _roomPrimitiveCount;
+    private int _roomPrimitiveCount;            // Cantidad total de triangulos, cada 3 debe de ser un triangulo
 
     private Vector3 _cameraPosition = new Vector3(0, 50, 150);
     private float _playerRotation = 0f;
