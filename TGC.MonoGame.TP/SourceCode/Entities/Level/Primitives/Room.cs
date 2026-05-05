@@ -1,14 +1,17 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using System.Reflection.Metadata.Ecma335;
+using System.Collections.Generic;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
-{  
+{
     public class Room
     {
         public readonly Floor _floor;
         public Ceiling _ceiling;
         public Wall _wall;
+
+        // Centros de agujeros (ventanas/puertas) => para poder centrar modelos de ventanas o puertas mas tarde
+        public List<Vector3> OpeningCenters { get; } = new();
 
         public Room()
         {
@@ -17,30 +20,72 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
             _wall = new Wall();
         }
 
-        public MeshData CreateRoom(float width, float height, float depth, 
-            Color floorColor, Color ceilingColor, Color frontWallColor, Color backWallColor, Color leftWallColor, Color rightWallColor)
+        public MeshData CreateRoom(
+            float width, float height, float depth,
+            Color floorColor, Color ceilingColor, Color frontWallColor,
+            Color backWallColor, Color leftWallColor, Color rightWallColor,
+            WallOpening frontOpening, WallOpening backOpening,
+            WallOpening leftOpening, WallOpening rightOpening)
         {
-            var roomVertices = new VertexPositionColor[24];
+            var vertices = new List<VertexPositionColor>();
+            var indices = new List<ushort>();
 
-            _floor.CreateFloor(width, depth, floorColor).CopyTo(roomVertices, 0);
-            _ceiling.CreateCeiling(width, height, depth, ceilingColor).CopyTo(roomVertices, 4);
-            _wall.CreateWalls(width, height, depth, 
-                              frontWallColor, backWallColor, leftWallColor, rightWallColor).CopyTo(roomVertices, 8);
-
-            var roomIndices = new ushort[36];
-            for (int face = 0; face < 6; face++)
+            void Append(VertexPositionColor[] v, ushort[] i)
             {
-                int v = face * 4;
-                int i = face * 6;
-                roomIndices[i + 0] = (ushort)(v + 0);
-                roomIndices[i + 1] = (ushort)(v + 1);
-                roomIndices[i + 2] = (ushort)(v + 2);
-                roomIndices[i + 3] = (ushort)(v + 0);
-                roomIndices[i + 4] = (ushort)(v + 2);
-                roomIndices[i + 5] = (ushort)(v + 3);
+                ushort offset = (ushort)vertices.Count; // Desde que valor debe de arrancar para crear los triangulos
+                vertices.AddRange(v);
+                // Se calcula el valor de los indices nuevo ya que para este punto Floor y Ceiling ya tienen sus indices en la lista
+                for (int k = 0; k < i.Length; k++)
+                    indices.Add((ushort)(i[k] + offset));
             }
 
-            return new MeshData(roomVertices, roomIndices);
+            // Floor
+            vertices.AddRange(_floor.CreateFloor(width, depth, floorColor));
+            // Ceiling
+            vertices.AddRange(_ceiling.CreateCeiling(width, height, depth, ceilingColor));
+
+            // Indices para Floor y Ceiling
+            ushort[] quad = { 0, 1, 2, 0, 2, 3 };
+            for (int face = 0; face < 2; face++)
+            {
+                ushort baseV = (ushort)(face * 4);
+                indices.Add((ushort)(baseV + quad[0]));
+                indices.Add((ushort)(baseV + quad[1]));
+                indices.Add((ushort)(baseV + quad[2]));
+                indices.Add((ushort)(baseV + quad[3]));
+                indices.Add((ushort)(baseV + quad[4]));
+                indices.Add((ushort)(baseV + quad[5]));
+            }
+
+            // FrontWall
+            {
+                var mesh = _wall.CreateFrontWall(width, height, depth, frontWallColor, frontOpening);
+                Append(mesh.Vertices, mesh.Indices);
+                OpeningCenters.AddRange(mesh.OpeningCenters);
+            }
+
+            // BackWall
+            {
+                var mesh = _wall.CreateBackWall(width, height, depth, backWallColor, backOpening);
+                Append(mesh.Vertices, mesh.Indices);
+                OpeningCenters.AddRange(mesh.OpeningCenters);
+            }
+
+            // LeftWall
+            {
+                var mesh = _wall.CreateLeftWall(width, height, depth, leftWallColor, leftOpening);
+                Append(mesh.Vertices, mesh.Indices);
+                OpeningCenters.AddRange(mesh.OpeningCenters);
+            }
+
+            // RightWall
+            {
+                var mesh = _wall.CreateRightWall(width, height, depth, rightWallColor, rightOpening);
+                Append(mesh.Vertices, mesh.Indices);
+                OpeningCenters.AddRange(mesh.OpeningCenters);
+            }
+
+            return new MeshData(vertices.ToArray(), indices.ToArray());
         }
     }
 }

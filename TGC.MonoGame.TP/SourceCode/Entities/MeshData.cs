@@ -1,9 +1,6 @@
-﻿using Microsoft.Xna.Framework.Graphics;
-using System;
+﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities
 {
@@ -16,6 +13,20 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
         {
             Vertices = vertices;
             Indices = indices;
+        }
+    }
+
+    public class MeshDataWithOpenings
+    {
+        public VertexPositionColor[] Vertices;
+        public ushort[] Indices;
+        public List<Vector3> OpeningCenters;
+
+        public MeshDataWithOpenings(VertexPositionColor[] vertices, ushort[] indices, List<Vector3> centers)
+        {
+            Vertices = vertices;
+            Indices = indices;
+            OpeningCenters = centers;
         }
     }
 }

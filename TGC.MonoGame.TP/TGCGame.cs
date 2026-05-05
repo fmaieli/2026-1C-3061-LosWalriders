@@ -35,6 +35,7 @@ public class TGCGame : Game
 
     private VertexBuffer _roomVertexBuffer;
     private IndexBuffer _roomIndexBuffer;
+    private int _roomPrimitiveCount;
 
     private Vector3 _cameraPosition = new Vector3(0, 50, 150);
     private float _playerRotation = 0f;
@@ -109,8 +110,15 @@ public class TGCGame : Game
             frontWallColor: Color.Red,
             backWallColor: Color.Pink,
             leftWallColor: Color.Green,
-            rightWallColor: Color.Blue
+            rightWallColor: Color.Blue,
+            frontOpening: WallOpening.Door(40f, 80f),
+            backOpening: WallOpening.Solid(),
+            leftOpening: WallOpening.Window(50f, 30f),
+            rightOpening: WallOpening.Window(60f, 30f)
         );
+
+        // Centro para los openings
+        List<Vector3> centers = room.OpeningCenters;
 
         _roomVertexBuffer = new VertexBuffer(
             GraphicsDevice,
@@ -127,6 +135,8 @@ public class TGCGame : Game
             BufferUsage.WriteOnly
         );
         _roomIndexBuffer.SetData(roomMesh.Indices);
+
+        _roomPrimitiveCount = roomMesh.Indices.Length / 3;
 
         // Varias habitaciones en distintas posiciones
         _roomWorlds.Add(Matrix.CreateTranslation(0, 0, 0));
@@ -274,7 +284,7 @@ public class TGCGame : Game
                     PrimitiveType.TriangleList,
                     0,
                     0,
-                    primitiveCount: 12
+                    primitiveCount: _roomPrimitiveCount
                 );
             }
         }
