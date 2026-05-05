@@ -34,13 +34,20 @@ public class TGCGame : Game
     private Matrix _projection;
 
     private Effect _effect;
+
     private readonly List<(VertexBuffer VertexBuffer, IndexBuffer IndexBuffer, int PrimitiveCount, Matrix World)> _rooms = new();
     private readonly Dictionary<string, Model> _modelCache = new();
 
-    private Vector3 _cameraPosition = new Vector3(0, 50, 150);
-    private float _playerRotation = 0f;
-
     private readonly List<(Model Model, Matrix World, string Name)> _models = new();
+
+    private Vector3 _cameraPosition = new Vector3(0, 50, 150);
+    private float _playerRotation = 0f;    
+
+    private VertexBuffer _groundVertexBuffer;
+    private IndexBuffer _groundIndexBuffer;
+    private int _groundPrimitiveCount;
+
+    private readonly List<(Model Model, Matrix World, string Name)> _trees = new();
 
     /// <summary>
     ///     Constructor del juego.
@@ -80,7 +87,7 @@ public class TGCGame : Game
         _world = Matrix.Identity;
         _view = Matrix.CreateLookAt(Vector3.UnitZ * 150, Vector3.Zero, Vector3.Up);
         _projection =
-            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 1500);
+            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 2500);
 
         base.Initialize();
     }
@@ -207,7 +214,42 @@ public class TGCGame : Game
             }
         }
 
-        Window.Title = $"TGC.MonoGame.TP - Models: {_models.Count}";
+        // Crear suelo
+        float gridWidth = 3 * (roomWidth * 2f + roomGap); // Ancho de la 3 habitaciones
+        float gridDepth = 3 * (roomDepth * 2f + roomGap); // Profundidad de las 3 habitaciones
+
+        // Gran tamaño para el suelo alrededor
+        float groundMargin = 4000f;
+        (_groundVertexBuffer, _groundIndexBuffer, _groundPrimitiveCount) =
+            GroundBuilderHelper.Create(
+                GraphicsDevice,
+                gridWidth * 0.5f + groundMargin,
+                gridDepth * 0.5f + groundMargin,
+                Color.Brown);
+
+        // Cantidad de arboles y escala
+        int treeCount = 300;
+        float treeScale = 0.1f;
+
+        var treeModel = Content.Load<Model>("Models/World/PSX_Low_Poly_Tree");
+        ApplyCustomEffectToModel(treeModel, _effect);
+
+        for (int i = 0; i < treeCount; i++)
+        {
+            // Valor entre 0 y 1 para generar las distancias de los arboles
+            float x = (float)(rng.NextDouble() * (gridWidth + groundMargin * 2) - (gridWidth * 0.5f + groundMargin));
+            float z = (float)(rng.NextDouble() * (gridDepth + groundMargin * 2) - (gridDepth * 0.5f + groundMargin));
+
+            // Randomizo la rotacion en Y y con valores aleatorios entre 0 y 1
+            float rotY = MathHelper.ToRadians((float)rng.NextDouble() * 360f);
+
+            var world = Matrix.CreateScale(treeScale) * Matrix.CreateRotationY(rotY) *
+                Matrix.CreateTranslation(x, -1f, z); // Mismo nivel que el suelo -> revisar Draw para el suelo
+
+            _trees.Add((treeModel, world, "World/PSX_Low_Poly_Tree"));
+        }
+
+        Window.Title = $"TGC.MonoGame.TP - Models: {_models.Count + _trees.Count}";
 
         base.LoadContent();
     }
@@ -271,6 +313,27 @@ public class TGCGame : Game
         _effect.Parameters["UseVertexColor"]?.SetValue(true);
         _effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
 
+        // Suelo
+        if (_groundVertexBuffer != null && _groundIndexBuffer != null)
+        {
+            GraphicsDevice.SetVertexBuffer(_groundVertexBuffer);
+            GraphicsDevice.Indices = _groundIndexBuffer;
+            // Por bleeding entre habitaciones y suelo
+            _effect.Parameters["World"]?.SetValue(Matrix.CreateTranslation(0f, -1f, 0f));
+
+            foreach (var pass in _effect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
+                GraphicsDevice.DrawIndexedPrimitives(
+                    PrimitiveType.TriangleList,
+                    0,
+                    0,
+                    _groundPrimitiveCount
+                );
+            }
+        }
+
+        // Habitaciones
         foreach (var room in _rooms)
         {
             GraphicsDevice.SetVertexBuffer(room.VertexBuffer);
@@ -289,7 +352,14 @@ public class TGCGame : Game
             }
         }
 
+        // Dibujado de modelos en habitaciones
         foreach (var (model, world, name) in _models)
+        {
+            DrawModelWithCustomEffect(model, world, name);
+        }
+
+        // Dibujado de arboles en suelo
+        foreach (var (model, world, name) in _trees)
         {
             DrawModelWithCustomEffect(model, world, name);
         }
