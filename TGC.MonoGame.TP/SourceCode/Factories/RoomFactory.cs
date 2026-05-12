@@ -15,6 +15,7 @@ namespace TGC.MonoGame.TP.SourceCode.Factories
             RoomType.Living => new LivingRoom(),
             RoomType.Outdoor => new OutdoorRoom(),
             RoomType.Hallway => new HallwayRoom(),
+            RoomType.Entrance => new HallwayRoom(),
             _ => null
         };
     }

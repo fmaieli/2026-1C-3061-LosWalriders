@@ -8,6 +8,7 @@
         Kitchen,
         Living,
         Outdoor,
-        Hallway
+        Hallway,
+        Entrance
     }
 }

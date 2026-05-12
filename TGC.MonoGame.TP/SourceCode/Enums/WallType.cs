@@ -4,6 +4,7 @@
     {
         Solid,
         Door,
-        Window
+        Window,
+        Empty
     }
 }
