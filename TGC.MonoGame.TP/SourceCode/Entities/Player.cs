@@ -12,6 +12,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
         private float _cameraPitch = 0f;
         private bool _freeCameraMode = false;
         private KeyboardState _previousKeyboardState;
+        private MouseState _previousMouseState;
 
         public Matrix View { get; private set; }
 
@@ -34,6 +35,20 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             float moveSpeed = _freeCameraMode ? 600f : 300f;
             float turnSpeed = 3f;
 
+            // Implementacion vista desde mouse
+            if (_previousMouseState != default)
+            {
+                float mouseSensitivity = 0.003f;
+                // Calculo cuanto se movio el mouse desde el frame anterior
+                int deltaX = mouseState.X - _previousMouseState.X;
+                int deltaY = mouseState.Y - _previousMouseState.Y;
+
+                // Multiplico el valor obtenido por la sensibilidad para modificar la nueva posicion de la camara
+                Rotation -= deltaX * mouseSensitivity;      // Eje X
+                _cameraPitch -= deltaY * mouseSensitivity;  // Eje Y
+            }
+            _previousMouseState = mouseState;
+
             // Rotacion de la camara para modo normal
             if (keyboardState.IsKeyDown(Keys.Left)) Rotation += turnSpeed * elapsedTime;
             if (keyboardState.IsKeyDown(Keys.Right)) Rotation -= turnSpeed * elapsedTime;
@@ -46,11 +61,6 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
 
                 // Limitamos el pitch para no dar una vuelta completa
                 _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
-            }
-            else
-            {
-                // Se endereza la vista a 0
-                _cameraPitch = 0f;
             }
 
             // Movimiento vertical
@@ -70,13 +80,20 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
             Vector3 right = Vector3.Transform(Vector3.Right, cameraRotation);
 
+            // Mirar hacia arriba y hacia abajo pero manteniendo la misma altura
+            forward.Y = 0f;
+            right.Y = 0f;
+            // Normalizo los vectores para que no se note la diferencia de velocidad al mirar hacia arriba o abajo
+            forward.Normalize();
+            right.Normalize();
+
             if (keyboardState.IsKeyDown(Keys.W)) Position += forward * moveSpeed * elapsedTime;
             if (keyboardState.IsKeyDown(Keys.S)) Position -= forward * moveSpeed * elapsedTime;
             if (keyboardState.IsKeyDown(Keys.A)) Position -= right * moveSpeed * elapsedTime;
             if (keyboardState.IsKeyDown(Keys.D)) Position += right * moveSpeed * elapsedTime;
 
             // Anteriormente UpdateViewMatrix
-            View = Matrix.CreateLookAt(Position, Position + forward, Vector3.Up);
+            View = Matrix.CreateLookAt(Position, Position + Vector3.Transform(Vector3.Forward, cameraRotation), Vector3.Up);
 
             // Guardado del estado del teclado para proximo frame - toggle de teclas
             _previousKeyboardState = keyboardState;
