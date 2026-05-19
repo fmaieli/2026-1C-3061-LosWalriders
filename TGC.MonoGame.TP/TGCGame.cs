@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives;
 using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Factories;
@@ -40,8 +41,14 @@ public class TGCGame : Game
 
     private readonly List<(Model Model, Matrix World, string Name)> _models = new();
 
+    // Variables de camara Player
     private Vector3 _cameraPosition = new Vector3(0, 50, 150);
-    private float _playerRotation = 0f;    
+    private float _playerRotation = 0f;
+
+    // Variables de camara Free (para debuguear y ver rapidamente el nivel generado)
+    private float _cameraPitch = 0f;
+    private bool _freeCameraMode = false;
+    private KeyboardState _previousKeyboardState;
 
     private VertexBuffer _groundVertexBuffer;
     private IndexBuffer _groundIndexBuffer;
@@ -106,68 +113,163 @@ public class TGCGame : Game
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
 
-        // Creo una matriz de 3x3 con habitaciones
-        // Dimensiones elegidas para todas las habitaciones
-        float roomWidth = 150f;
-        float roomHeight = 120f;
-        float roomDepth = 150f;
-
-        float roomGap = 1f;   // Distancia entre las habitaciones para que no haya bleeding
-        float cellSize = 30f; // Tamaño de cada celda definido arbitrariamente para todas las habitaciones
-
-        // Tamaño de las aberturas
-        var door = WallOpening.Door(40f, 80f);
-        var window = WallOpening.Window(50f, 30f);
-        var solid = WallOpening.Solid();
-
-        var grid = new[]
+        string[] mapLayout = new string[]
         {
-            // Row Z = 0
-            new[]
-            {
-                (RoomType.Bed,     front: door, back: solid, left: window, right: door),
-                (RoomType.Kitchen, front: door, back: window, left: door,   right: door),
-                (RoomType.Bed,     front: door, back: solid, left: door,   right: window),
-            },
-            // Row Z = 1
-            new[]
-            {
-                (RoomType.Living,  front: door, back: door,  left: window, right: door),
-                (RoomType.Hallway, front: door, back: door,  left: door,   right: door),
-                (RoomType.Bath,    front: door, back: door,  left: door,   right: window),
-            },
-            // Row Z = 2
-            new[]
-            {
-                (RoomType.Computer, front: solid, back: door, left: window, right: door),
-                (RoomType.Outdoor,  front: window, back: door, left: door, right: door),
-                (RoomType.Bed,      front: solid, back: door, left: door, right: window),
-            }
+            // 15 horizontal
+            "       Z       ", // 00 -> Exit Level
+            "  HHHHHH       ", // 01
+            "  H OOOOOOO    ", // 02
+            "  H OOOOOOO   X", // 03
+            " CC OOOOOOOHHHH", // 04
+            " CC OOOOOOOHBBH", // 05
+            "BCC OOOOOOOHBBH", // 06
+            "BCC OOOOOOOHH H", // 07
+            "HCCHOOOOOOOHBBH", // 08
+            "HCCHOOOOOOO BBH", // 09
+            "HCCH   H   HHHH", // 10
+            "HCCH   H   HBBH", // 11
+            "HCCHHHHHHHHHBBH", // 12
+            "H  V  BH      H", // 13
+            "H  V  BH      H", // 14
+            "HHHHHHHHHHHVVVH", // 15
+            "HBB H  H  HKK H", // 16
+            "HBB HLLLLLHKK H", // 17
+            "HH HHLLLLLHKK H", // 18
+            "HBB HLLLLLHKK H", // 19
+            "HBB HLLLLLHKK H", // 20
+            "H V HLLLLLHKK H", // 21
+            " BB H  H  HKKBH", // 22 
+            " BB H EEE HKKBH", // 23 (Entrance Level 3x3)
+            " HHHHHEEEHHHHHH", // 24 
+            "      EPE      ", // 25 (Player en el centro de Entrance)
+            "               "  // 26
         };
 
-        var rng = new Random(); // Semilla random para que los elementos se muestren de forma aleatoria cada vez que se genera
+        int rows = mapLayout.Length;
+        int cols = mapLayout[0].Length;
 
-        for (int z = 0; z < 3; z++)
+        float baseRoomWidth = 150f;
+        float baseRoomDepth = 150f;
+        float roomHeight = 120f;        
+        float roomGap = 0.5f;         // Distancia entre las habitaciones para que no haya bleeding
+        float cellSize = 30f;
+
+        // Se busca al Player dentro del "mapa" para poder mutar su valor a E
+        int playerGridX = 0, playerGridZ = 0;
+        for (int z = 0; z < rows; z++)
         {
-            for (int x = 0; x < 3; x++)
+            for (int x = 0; x < cols; x++)
             {
-                var roomDefinition = grid[z][x]; // Tupla de 5 elementos
+                if (mapLayout[z][x] == 'P')
+                {
+                    playerGridX = x;
+                    playerGridZ = z;
+
+                    // Se convierte a P por E para armar el bloque continuo de la habitacion Entrance
+                    char[] rowChars = mapLayout[z].ToCharArray();
+                    rowChars[x] = 'E';
+                    mapLayout[z] = new string(rowChars);
+                    break;
+                }
+            }
+        }
+
+        float startWorldX = _cameraPosition.X - (playerGridX * (baseRoomWidth * 2f + roomGap));
+        float startWorldZ = _cameraPosition.Z - (playerGridZ * (baseRoomDepth * 2f + roomGap));
+
+        var rng = new Random();
+
+        // Control para las celdas ya procesadas
+        bool[,] processedCell = new bool[rows, cols];
+
+        for (int z = 0; z < rows; z++)
+        {
+            for (int x = 0; x < cols; x++)
+            {
+                if (processedCell[z, x]) continue;  // Si ya fue procesada se saltea
+
+                char currentCell = mapLayout[z][x]; // Cell a procesar
+
+                // Ignorar celdas de Player, Exit, Enemy o vacias
+                if (currentCell == ' ' || currentCell == 'P' || currentCell == 'Z' || currentCell == 'X')
+                {
+                    processedCell[z, x] = true;
+                    continue;
+                }
+
+                var roomData = LevelGeneratorHelper.GetRoomData(currentCell);
+                if (roomData == null)
+                {
+                    processedCell[z, x] = true;
+                    continue;
+                }
+               
+                // Ver que tan ancha es la habitación hacia la derecha
+                int widthCells = 1;
+                while (x + widthCells < cols && mapLayout[z][x + widthCells] == currentCell && !processedCell[z, x + widthCells])
+                {
+                    widthCells++;
+                }
+
+                // Ver que tan profunda es hacia abajo (manteniendo el mismo ancho)
+                int heightCells = 1;
+                bool canExpand = true;
+                while (z + heightCells < rows)
+                {
+                    for (int i = 0; i < widthCells; i++)
+                    {
+                        if (mapLayout[z + heightCells][x + i] != currentCell || processedCell[z + heightCells, x + i])
+                        {
+                            canExpand = false;
+                            break;
+                        }
+                    }
+                    if (!canExpand) break;
+                    heightCells++;
+                }
+
+                // Marcar todas las celdas del bloque como visitadas
+                for (int hz = 0; hz < heightCells; hz++)
+                    for (int wx = 0; wx < widthCells; wx++)
+                        processedCell[z + hz, x + wx] = true;
+
+                float cellStepX = baseRoomWidth * 2f + roomGap;
+                float cellStepZ = baseRoomDepth * 2f + roomGap;
+
+                // Nuevos anchos/profundidades
+                float mergedWidthHalf = baseRoomWidth + (widthCells - 1) * (cellStepX / 2f);
+                float mergedDepthHalf = baseRoomDepth + (heightCells - 1) * (cellStepZ / 2f);
+
+                // Centro exacto en el mundo 3D
+                float mergedWorldX = startWorldX + (x + (widthCells - 1) / 2f) * cellStepX;
+                float mergedWorldZ = startWorldZ + (z + (heightCells - 1) / 2f) * cellStepZ;
+
+                // Para determinar las puertas, miramos al vecino que cae justo en el medio de las paredes fusionadas
+                char frontNeighbor = (z + heightCells < rows) ? mapLayout[z + heightCells][x + widthCells / 2] : ' ';
+                char backNeighbor = (z > 0) ? mapLayout[z - 1][x + widthCells / 2] : ' ';
+                char leftNeighbor = (x > 0) ? mapLayout[z + heightCells / 2][x - 1] : ' ';
+                char rightNeighbor = (x + widthCells < cols) ? mapLayout[z + heightCells / 2][x + widthCells] : ' ';
+
+                var frontOpening = LevelGeneratorHelper.DetermineOpening(currentCell, frontNeighbor);
+                var backOpening = LevelGeneratorHelper.DetermineOpening(currentCell, backNeighbor);
+                var leftOpening = LevelGeneratorHelper.DetermineOpening(currentCell, leftNeighbor);
+                var rightOpening = LevelGeneratorHelper.DetermineOpening(currentCell, rightNeighbor);
 
                 var room = new Room();
                 var mesh = room.CreateRoom(
-                    width: roomWidth,
-                    height: roomHeight,
-                    depth: roomDepth,
+                    width: mergedWidthHalf, 
+                    height: roomHeight, 
+                    depth: mergedDepthHalf, 
                     floorColor: Color.Black,
-                    ceilingColor: Color.Yellow,
-                    frontWallColor: Color.Red,
-                    backWallColor: Color.Pink,
-                    leftWallColor: Color.Green,
-                    rightWallColor: Color.Blue,
-                    frontOpening: roomDefinition.front,
-                    backOpening: roomDefinition.back,
-                    leftOpening: roomDefinition.left,
-                    rightOpening: roomDefinition.right
+                    ceilingColor: Color.DarkGray,
+                    frontWallColor: roomData.Value.FrontBack,
+                    backWallColor: roomData.Value.FrontBack,
+                    leftWallColor: roomData.Value.LeftRight,
+                    rightWallColor: roomData.Value.LeftRight,
+                    frontOpening: frontOpening, 
+                    backOpening: backOpening,
+                    leftOpening: leftOpening, 
+                    rightOpening: rightOpening
                 );
 
                 var vertexBuffer = new VertexBuffer(GraphicsDevice, typeof(VertexPositionColor), mesh.Vertices.Length, BufferUsage.WriteOnly);
@@ -177,22 +279,18 @@ public class TGCGame : Game
                 indexBuffer.SetData(mesh.Indices);
 
                 int primCount = mesh.Indices.Length / 3;
-
-                float worldX = x * (roomWidth * 2f + roomGap);
-                float worldZ = z * (roomDepth * 2f + roomGap);
-                var roomWorld = Matrix.CreateTranslation(worldX, 0f, worldZ); // Muevo la habitacion al lugar donde debera de quedar
-
-                _rooms.Add((vertexBuffer, indexBuffer, primCount, roomWorld)); // Agrego la informacion de cada habitacion en la variable global _rooms
+                var roomWorld = Matrix.CreateTranslation(mergedWorldX, 0f, mergedWorldZ);
+                _rooms.Add((vertexBuffer, indexBuffer, primCount, roomWorld));
 
                 // Renderizado de modelos por habitacion
-                IRoomAssets roomTypeInstance = RoomFactory.Create(roomDefinition.Item1);
+                IRoomAssets roomTypeInstance = RoomFactory.Create(roomData.Value.Type);
                 if (roomTypeInstance != null)
                 {
                     var placements = ModelPlacementOnRoomHelper.GeneratePlacements(
-                        roomTypeInstance,
-                        roomWidth,
-                        roomDepth,
-                        cellSize,
+                        roomTypeInstance, 
+                        mergedWidthHalf, 
+                        mergedDepthHalf,
+                        cellSize, 
                         seed: rng.Next()
                     );
 
@@ -215,8 +313,9 @@ public class TGCGame : Game
         }
 
         // Crear suelo
-        float gridWidth = 3 * (roomWidth * 2f + roomGap); // Ancho de la 3 habitaciones
-        float gridDepth = 3 * (roomDepth * 2f + roomGap); // Profundidad de las 3 habitaciones
+        // TODO: REVISAR PARA COMPLETAR EL LARGO DE TODAS LAS HABITACIONES - GRILLA DE 15x27
+        float gridWidth = 3 * (baseRoomWidth * 2f + roomGap); // Ancho de la 3 habitaciones
+        float gridDepth = 3 * (baseRoomDepth * 2f + roomGap); // Profundidad de las 3 habitaciones
 
         // Gran tamaño para el suelo alrededor
         float groundMargin = 4000f;
@@ -261,29 +360,72 @@ public class TGCGame : Game
     /// </summary>
     protected override void Update(GameTime gameTime)
     {
-        if (Keyboard.GetState().IsKeyDown(Keys.Escape))
-            Exit();
-
-        float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         var keyboardState = Keyboard.GetState();
         var mouseState = Mouse.GetState();
 
-        float moveSpeed = 300f;
+        if (keyboardState.IsKeyDown(Keys.Escape))
+            Exit();
+
+        // Valores para saber si presione Ctrl y Shift (Izquierdos)
+        bool isCtrlDown = keyboardState.IsKeyDown(Keys.LeftControl);
+        bool isShiftDown = keyboardState.IsKeyDown(Keys.LeftShift);
+
+        if (isCtrlDown && isShiftDown && keyboardState.IsKeyDown(Keys.F) && _previousKeyboardState.IsKeyUp(Keys.F))
+        {
+            _freeCameraMode = !_freeCameraMode; // Activo/Desactivo FreeCamera
+        }
+
+        float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+        // En FreeCamera la velocidad es el doble
+        float moveSpeed = _freeCameraMode ? 600f : 300f;
         float turnSpeed = 3f;
 
+        // Rotacion de la camara para modo normal
         if (keyboardState.IsKeyDown(Keys.Left)) _playerRotation += turnSpeed * elapsedTime;
         if (keyboardState.IsKeyDown(Keys.Right)) _playerRotation -= turnSpeed * elapsedTime;
 
-        Vector3 forward = Vector3.Transform(Vector3.Forward, Matrix.CreateRotationY(_playerRotation));
-        Vector3 right = Vector3.Cross(forward, Vector3.Up);
+        // Rotacion de la camara arriba y abajo
+        if (_freeCameraMode)
+        {
+            if (keyboardState.IsKeyDown(Keys.Up)) _cameraPitch += turnSpeed * elapsedTime;
+            if (keyboardState.IsKeyDown(Keys.Down)) _cameraPitch -= turnSpeed * elapsedTime;
+
+            // Limitamos el pitch para no dar una vuelta completa
+            _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
+        }
+        else
+        {
+            // Se endereza la vista a 0
+            _cameraPitch = 0f;
+        }
+
+        // Movimiento vertical
+        if (_freeCameraMode)
+        {
+            // Subir y bajar en el eje Y
+            if (keyboardState.IsKeyDown(Keys.E)) _cameraPosition += Vector3.Up * moveSpeed * elapsedTime;
+            if (keyboardState.IsKeyDown(Keys.Q)) _cameraPosition -= Vector3.Up * moveSpeed * elapsedTime;
+        }
+        else
+        {
+            // En modo normal, el jugador se queda al ras del suelo
+            _cameraPosition.Y = 50f;
+        }
+
+        Matrix cameraRotation = Matrix.CreateFromYawPitchRoll(_playerRotation, _cameraPitch, 0f);
+        Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
+        Vector3 right = Vector3.Transform(Vector3.Right, cameraRotation);
 
         if (keyboardState.IsKeyDown(Keys.W)) _cameraPosition += forward * moveSpeed * elapsedTime;
         if (keyboardState.IsKeyDown(Keys.S)) _cameraPosition -= forward * moveSpeed * elapsedTime;
         if (keyboardState.IsKeyDown(Keys.A)) _cameraPosition -= right * moveSpeed * elapsedTime;
-        if (keyboardState.IsKeyDown(Keys.D)) _cameraPosition += right * moveSpeed * elapsedTime;
+        if (keyboardState.IsKeyDown(Keys.D)) _cameraPosition += right * moveSpeed * elapsedTime;       
 
-        _cameraPosition.Y = 50f;
         UpdateViewMatrix();
+
+        // Guardado del estado del teclado para proximo frame - toggle de teclas
+        _previousKeyboardState = keyboardState;
 
         base.Update(gameTime);
     }
@@ -416,7 +558,9 @@ public class TGCGame : Game
 
     private void UpdateViewMatrix()
     {
-        Vector3 forward = Vector3.Transform(Vector3.Forward, Matrix.CreateRotationY(_playerRotation));
+        Matrix cameraRotation = Matrix.CreateFromYawPitchRoll(_playerRotation, _cameraPitch, 0f);
+        Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
+
         _view = Matrix.CreateLookAt(_cameraPosition, _cameraPosition + forward, Vector3.Up);
     }
 }
