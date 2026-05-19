@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Collections.Generic;
+using TGC.MonoGame.TP.SourceCode.Entities;
 using TGC.MonoGame.TP.SourceCode.Helpers;
 
 namespace TGC.MonoGame.TP;
@@ -33,14 +34,7 @@ public class TGCGame : Game
     private readonly Dictionary<string, Model> _modelCache = new();
     private readonly List<(Model Model, Matrix World, string Name)> _models = new();
 
-    // Variables de camara Player
-    private Vector3 _cameraPosition = new Vector3(0, 50, 150);
-    private float _playerRotation = 0f;
-
-    // Variables de camara Free (para debuguear y ver rapidamente el nivel generado)
-    private float _cameraPitch = 0f;
-    private bool _freeCameraMode = false;
-    private KeyboardState _previousKeyboardState;
+    private readonly Player _player = new();
 
     private VertexBuffer _groundVertexBuffer;
     private IndexBuffer _groundIndexBuffer;
@@ -110,7 +104,7 @@ public class TGCGame : Game
             GraphicsDevice,
             Content,
             _effect,
-            _cameraPosition,
+            _player.Position,
             _modelCache,
             _rooms,
             _models,
@@ -132,72 +126,11 @@ public class TGCGame : Game
     /// </summary>
     protected override void Update(GameTime gameTime)
     {
-        var keyboardState = Keyboard.GetState();
-        var mouseState = Mouse.GetState();
-
-        if (keyboardState.IsKeyDown(Keys.Escape))
+        if (Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
-        // Valores para saber si presione Ctrl y Shift (Izquierdos)
-        bool isCtrlDown = keyboardState.IsKeyDown(Keys.LeftControl);
-        bool isShiftDown = keyboardState.IsKeyDown(Keys.LeftShift);
-
-        if (isCtrlDown && isShiftDown && keyboardState.IsKeyDown(Keys.F) && _previousKeyboardState.IsKeyUp(Keys.F))
-        {
-            _freeCameraMode = !_freeCameraMode; // Activo/Desactivo FreeCamera
-        }
-
-        float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-
-        // En FreeCamera la velocidad es el doble
-        float moveSpeed = _freeCameraMode ? 600f : 300f;
-        float turnSpeed = 3f;
-
-        // Rotacion de la camara para modo normal
-        if (keyboardState.IsKeyDown(Keys.Left)) _playerRotation += turnSpeed * elapsedTime;
-        if (keyboardState.IsKeyDown(Keys.Right)) _playerRotation -= turnSpeed * elapsedTime;
-
-        // Rotacion de la camara arriba y abajo
-        if (_freeCameraMode)
-        {
-            if (keyboardState.IsKeyDown(Keys.Up)) _cameraPitch += turnSpeed * elapsedTime;
-            if (keyboardState.IsKeyDown(Keys.Down)) _cameraPitch -= turnSpeed * elapsedTime;
-
-            // Limitamos el pitch para no dar una vuelta completa
-            _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
-        }
-        else
-        {
-            // Se endereza la vista a 0
-            _cameraPitch = 0f;
-        }
-
-        // Movimiento vertical
-        if (_freeCameraMode)
-        {
-            // Subir y bajar en el eje Y
-            if (keyboardState.IsKeyDown(Keys.E)) _cameraPosition += Vector3.Up * moveSpeed * elapsedTime;
-            if (keyboardState.IsKeyDown(Keys.Q)) _cameraPosition -= Vector3.Up * moveSpeed * elapsedTime;
-        }
-        else
-        {
-            // En modo normal, el jugador se queda al ras del suelo
-            _cameraPosition.Y = 50f;
-        }
-
-        Matrix cameraRotation = Matrix.CreateFromYawPitchRoll(_playerRotation, _cameraPitch, 0f);
-        Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
-        Vector3 right = Vector3.Transform(Vector3.Right, cameraRotation);
-
-        if (keyboardState.IsKeyDown(Keys.W)) _cameraPosition += forward * moveSpeed * elapsedTime;
-        if (keyboardState.IsKeyDown(Keys.S)) _cameraPosition -= forward * moveSpeed * elapsedTime;
-        if (keyboardState.IsKeyDown(Keys.A)) _cameraPosition -= right * moveSpeed * elapsedTime;
-        if (keyboardState.IsKeyDown(Keys.D)) _cameraPosition += right * moveSpeed * elapsedTime;
-
-        UpdateViewMatrix();
-
-        // Guardado del estado del teclado para proximo frame - toggle de teclas
-        _previousKeyboardState = keyboardState;
+        _player.Update(gameTime);
+        _view = _player.View;
 
         base.Update(gameTime);
     }
@@ -310,13 +243,5 @@ public class TGCGame : Game
         // Libero los recursos.
         Content.Unload();
         base.UnloadContent();
-    }
-
-    private void UpdateViewMatrix()
-    {
-        Matrix cameraRotation = Matrix.CreateFromYawPitchRoll(_playerRotation, _cameraPitch, 0f);
-        Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
-
-        _view = Matrix.CreateLookAt(_cameraPosition, _cameraPosition + forward, Vector3.Up);
     }
 }
