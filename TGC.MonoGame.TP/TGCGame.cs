@@ -99,6 +99,8 @@ public class TGCGame : Game
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
 
+        _player.LoadContent(Content, _effect);
+
         // Delegamos TODA la generacion del nivel al Helper
         LevelGeneratorHelper.GenerateLevel(
             GraphicsDevice,
@@ -210,6 +212,9 @@ public class TGCGame : Game
         {
             DrawModelWithCustomEffect(model, world, name);
         }
+
+        // Dibujado de brazos para el jugador
+        _player.DrawArms(_view, _projection, GraphicsDevice);
 
         base.Draw(gameTime);
     }

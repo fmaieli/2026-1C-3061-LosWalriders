@@ -1,4 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Content;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities
@@ -15,6 +17,64 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
         private MouseState _previousMouseState;
 
         public Matrix View { get; private set; }
+
+        private Model _armsModel;
+
+        private Effect _armsEffect;
+
+        public void LoadContent(ContentManager content, Effect effect)
+        {
+            _armsEffect = content.Load<Effect>("Effects/ArmsShader");
+            _armsModel = content.Load<Model>("Models/Player/PSX_Player_Arms");
+
+            // Se aplica Clone a todas las partes del mesh para aplicarle el custom effect
+            foreach (var mesh in _armsModel.Meshes)
+            {
+                foreach (var part in mesh.MeshParts)
+                    part.Effect = _armsEffect.Clone();
+            }
+        }
+
+        public void DrawArms(Matrix view, Matrix projection, GraphicsDevice graphicsDevice)
+        {
+            if (_armsModel == null) return;
+
+            // Huesos del modelo
+            var bones = new Matrix[_armsModel.Bones.Count];
+            _armsModel.CopyAbsoluteBoneTransformsTo(bones);
+
+            // Hacia donde esta mirando el jugador y donde esta parado
+            Matrix cameraWorld = Matrix.Invert(view);
+
+            // Busco el lugar donde quede correctamente el modelo
+            Vector3 offset = new Vector3(-30f, -5f, -32f);
+
+            foreach (var mesh in _armsModel.Meshes)
+            {
+                Matrix centerOffset = Matrix.CreateTranslation(-mesh.BoundingSphere.Center);
+                float rotY = MathHelper.Pi; // Roto el modelo de los brazos 180°
+                Matrix rotation = Matrix.CreateRotationY(rotY);
+
+                Matrix world =
+                    Matrix.CreateScale(0.9f) *
+                    centerOffset *
+                    rotation *
+                    Matrix.CreateTranslation(offset) *
+                    cameraWorld;
+
+                foreach (var part in mesh.MeshParts)
+                {
+                    var fx = (Effect)part.Effect;
+                    fx.CurrentTechnique = fx.Techniques["BasicColorDrawing"];
+                    fx.Parameters["World"]?.SetValue(bones[mesh.ParentBone.Index] * world);
+                    fx.Parameters["View"]?.SetValue(view);
+                    fx.Parameters["Projection"]?.SetValue(projection);
+                    fx.Parameters["DiffuseColor"]?.SetValue(Color.Magenta.ToVector3());
+                }
+
+                mesh.Draw();
+            }
+        }
 
         public void Update(GameTime gameTime)
         {
