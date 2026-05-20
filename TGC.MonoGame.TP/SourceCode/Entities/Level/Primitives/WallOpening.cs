@@ -21,4 +21,6 @@ public class WallOpening
         Width = width,
         Height = height
     };
+
+    public static WallOpening Empty() => new WallOpening { Type = WallType.Empty };
 }

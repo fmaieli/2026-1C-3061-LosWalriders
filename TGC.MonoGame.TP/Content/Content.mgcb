@@ -13,6 +13,12 @@
 
 #---------------------------------- Content ---------------------------------#
 
+#begin Effects/ArmsShader.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/ArmsShader.fx
+
 #begin Effects/BasicShader.fx
 /importer:EffectImporter
 /processor:EffectProcessor

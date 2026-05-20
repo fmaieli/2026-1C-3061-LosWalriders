@@ -115,6 +115,12 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
                 return new MeshDataWithOpenings(vertices.ToArray(), indices.ToArray(), centers);
             }
 
+            if (opening.Type == WallType.Empty)
+            {
+                // No dibujar la pared, sirve para los pasillos
+                return new MeshDataWithOpenings(new VertexPositionColor[0], new ushort[0], centers);
+            }
+
             // Calcualo del 'agujero' para puerta o ventana
             float holeW = opening.Width;
             float holeH = opening.Height;
