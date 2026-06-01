@@ -12,6 +12,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 {
     public static class LevelGeneratorHelper
     {
+        // Lista con todas las colisiones posibles, usada para que el jugador y el enemigo no traspasen paredes
+        public static List<BoundingBox> WallColliders { get; } = new List<BoundingBox>();
+
         /// <summary>
         /// Reemplaza el material por defecto de los modelos con un material personalizado
         /// </summary>
@@ -26,24 +29,20 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             }
         }
 
-        public static WallOpening DetermineOpening(char currentCell, char neighborCell)
+        // Se mueve la logica de los pasillos a HallwayGeneratorHelper ya se complejizo
+        public static WallOpening DetermineRoomOpening(char roomCell, char neighborCell, float offset = 0f)
         {
-            // TODO: REVISAR LOGICA PARA DETERMINAR SI ES UN PASILLO PARA NO DIBUJAR LAS PAREDES,
-            // NO ESTA FUNCIONANDO CORRECTAMENTE
-            bool currentIsHallway = (currentCell == 'H' || currentCell == 'V');
-            bool neighborIsHallway = (neighborCell == 'H' || neighborCell == 'V');
+            if (roomCell == 'E' && (neighborCell == ' ' || neighborCell == '\0'))
+                return WallOpening.Door(40f, 80f, offset);
 
-            if (currentIsHallway && neighborIsHallway)
-                return WallOpening.Empty();
-
-            if (currentCell == 'E' && (neighborCell == ' ' || neighborCell == '\0'))
-                return WallOpening.Door(40f, 80f);
-
-            if (neighborCell == ' ' || neighborCell == '\0')
+            if (neighborCell == ' ' ||
+                neighborCell == '\0' ||
+                neighborCell == 'Z' ||
+                neighborCell == 'X')
                 return WallOpening.Solid();
 
-            return WallOpening.Door(40f, 80f);
-        }
+            return WallOpening.Door(40f, 80f, offset);
+        }        
 
         // Se pintan las paredes de las habitacion con Front-Back y Left-Right
         /// <summary>
@@ -75,6 +74,25 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             List<(Model, Matrix, string)> models, List<(Model, Matrix, string)> trees, out VertexBuffer groundVertexBuffer, out IndexBuffer groundIndexBuffer,
             out int groundPrimitiveCount)
         {
+            // Elimino las colisiones anteriores por precaucion
+            WallColliders.Clear();
+
+            string doorPath = "Items/PSX_Door";
+
+            // Tomo el modelo en caso de ya estar en modelCache y si existe lo extraigo en doorModel
+            if (!modelCache.TryGetValue(doorPath, out var doorModel))
+            {
+                // Se carga la puerta
+                doorModel = content.Load<Model>(TGCGame.ContentFolder3D + doorPath);
+                ApplyCustomEffectToModel(doorModel, effect);
+
+                // Guardo el modelo en modelCache
+                modelCache[doorPath] = doorModel;
+            }
+
+            // Lista de puertas creadas
+            var placedDoors = new HashSet<string>();
+
             string[] mapLayout = new string[]
             {
                 // 15 horizontal
@@ -112,7 +130,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
             float baseRoomWidth = 150f;
             float baseRoomDepth = 150f;
-            float roomHeight = 120f;        
+            float roomHeight = 120f;
             float roomGap = 0.5f;         // Distancia entre las habitaciones para que no haya bleeding
             float cellSize = 30f;
 
@@ -143,6 +161,8 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
             // Control para las celdas ya procesadas
             bool[,] processedCell = new bool[rows, cols];
+            var doorRegistry = new Dictionary<(int, int), List<HallwayDirection>>(); // Lista con las coordenadas donde se encuentran las puertas
+            var occupiedAreas = new List<BoundingBox>();
 
             for (int z = 0; z < rows; z++)
             {
@@ -152,19 +172,19 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
                     char currentCell = mapLayout[z][x]; // Cell a procesar
 
-                    // Ignorar celdas de Player, Exit, Enemy o vacias
-                    if (currentCell == ' ' || currentCell == 'P' || currentCell == 'Z' || currentCell == 'X')
+                    if (currentCell == ' ' || currentCell == 'P' ||
+                        currentCell == 'Z' || currentCell == 'X' ||
+                        HallwayGeneratorHelper.IsHallway(currentCell))
                     {
-                        processedCell[z, x] = true;
+                        if (!HallwayGeneratorHelper.IsHallway(currentCell))
+                        {
+                            processedCell[z, x] = true;
+                        }                            
                         continue;
                     }
 
                     var roomData = GetRoomData(currentCell);
-                    if (roomData == null)
-                    {
-                        processedCell[z, x] = true;
-                        continue;
-                    }
+                    if (roomData == null) continue;
 
                     // Ver que tan ancha es la habitación hacia la derecha
                     int widthCells = 1;
@@ -206,17 +226,50 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     float mergedWorldX = startWorldX + (x + (widthCells - 1) / 2f) * cellStepX;
                     float mergedWorldZ = startWorldZ + (z + (heightCells - 1) / 2f) * cellStepZ;
 
+                    occupiedAreas.Add(new BoundingBox(
+                        new Vector3(mergedWorldX - mergedWidthHalf, -10f, mergedWorldZ - mergedDepthHalf),
+                        new Vector3(mergedWorldX + mergedWidthHalf, 200f, mergedWorldZ + mergedDepthHalf)
+                    ));
+
                     // Para determinar las puertas, miramos al vecino que cae justo en el medio de las paredes fusionadas
                     char frontNeighbor = (z + heightCells < rows) ? mapLayout[z + heightCells][x + widthCells / 2] : ' ';
                     char backNeighbor = (z > 0) ? mapLayout[z - 1][x + widthCells / 2] : ' ';
                     char leftNeighbor = (x > 0) ? mapLayout[z + heightCells / 2][x - 1] : ' ';
                     char rightNeighbor = (x + widthCells < cols) ? mapLayout[z + heightCells / 2][x + widthCells] : ' ';
 
-                    var frontOpening = DetermineOpening(currentCell, frontNeighbor);
-                    var backOpening = DetermineOpening(currentCell, backNeighbor);
-                    var leftOpening = DetermineOpening(currentCell, leftNeighbor);
-                    var rightOpening = DetermineOpening(currentCell, rightNeighbor);
+                    // Calculo el centro de la pared donde estara la puerta, lo multiplico por cellStep para poder tener las mismas unidades
+                    float doorOffsetX = ((x + widthCells / 2) - (x + (widthCells - 1) / 2f)) * cellStepX;
+                    float doorOffsetZ = ((z + heightCells / 2) - (z + (heightCells - 1) / 2f)) * cellStepZ;
 
+                    // Le paso la celda actual, el vecino y el offset de la puerta
+                    var frontOpening = DetermineRoomOpening(currentCell, frontNeighbor, doorOffsetX);
+                    var backOpening = DetermineRoomOpening(currentCell, backNeighbor, -doorOffsetX);
+                    var leftOpening = DetermineRoomOpening(currentCell, leftNeighbor, doorOffsetZ);
+                    var rightOpening = DetermineRoomOpening(currentCell, rightNeighbor, -doorOffsetZ);
+
+                    // Se generan primero las habitaciones y luego los pasillos
+                    // Una vez se tiene cuales son las puertas de la habitaciones generades se genera luego las puertas en los pasillos
+                    // Registro las puertas y pongo el valor contrario para el pasillo ya que seria espejado
+                    if (frontOpening.Type == WallType.Door && HallwayGeneratorHelper.IsHallway(frontNeighbor))
+                        RegisterDoor(doorRegistry, z + heightCells, x + widthCells / 2, HallwayDirection.Back);
+
+                    // Pared Trasera
+                    if (backOpening.Type == WallType.Door && HallwayGeneratorHelper.IsHallway(backNeighbor))
+                        RegisterDoor(doorRegistry, z - 1, x + widthCells / 2, HallwayDirection.Front);
+
+                    // Pared Izquierda
+                    if (leftOpening.Type == WallType.Door && HallwayGeneratorHelper.IsHallway(leftNeighbor))
+                        RegisterDoor(doorRegistry, z + heightCells / 2, x - 1, HallwayDirection.Right);
+
+                    // Pared Derecha
+                    if (rightOpening.Type == WallType.Door && HallwayGeneratorHelper.IsHallway(rightNeighbor))
+                        RegisterDoor(doorRegistry, z + heightCells / 2, x + widthCells, HallwayDirection.Left);
+
+                    // Con toda la informacion, creo las colisiones para las paredes
+                    AddWallColliders(new Vector3(mergedWorldX, 0, mergedWorldZ), mergedWidthHalf, mergedDepthHalf, roomHeight,
+                                     frontOpening, backOpening, leftOpening, rightOpening);
+
+                    // Creo la habitacion
                     var room = new Room();
                     var mesh = room.CreateRoom(
                         width: mergedWidthHalf, 
@@ -243,6 +296,26 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     int primCount = mesh.Indices.Length / 3;
                     var roomWorld = Matrix.CreateTranslation(mergedWorldX, 0f, mergedWorldZ);
                     rooms.Add((vertexBuffer, indexBuffer, primCount, roomWorld));
+
+                    // Pared Frontal
+                    LevelGeneratorHelper.PlaceDoorModel(frontOpening, new Vector3(doorOffsetX, 0, mergedDepthHalf), 0f,
+                        z + heightCells - 1, x + widthCells / 2, z + heightCells, x + widthCells / 2,
+                        placedDoors, mergedWorldX, mergedWorldZ, doorModel, doorPath, models);
+
+                    // Pared Trasera
+                    LevelGeneratorHelper.PlaceDoorModel(backOpening, new Vector3(doorOffsetX, 0, -mergedDepthHalf), MathHelper.Pi,
+                        z, x + widthCells / 2, z - 1, x + widthCells / 2,
+                        placedDoors, mergedWorldX, mergedWorldZ, doorModel, doorPath, models);
+
+                    // Pared Izquierda
+                    LevelGeneratorHelper.PlaceDoorModel(leftOpening, new Vector3(-mergedWidthHalf, 0, doorOffsetZ), -MathHelper.PiOver2,
+                        z + heightCells / 2, x, z + heightCells / 2, x - 1,
+                        placedDoors, mergedWorldX, mergedWorldZ, doorModel, doorPath, models);
+
+                    // Pared Derecha
+                    LevelGeneratorHelper.PlaceDoorModel(rightOpening, new Vector3(mergedWidthHalf, 0, doorOffsetZ), MathHelper.PiOver2,
+                        z + heightCells / 2, x + widthCells - 1, z + heightCells / 2, x + widthCells,
+                        placedDoors, mergedWorldX, mergedWorldZ, doorModel, doorPath, models);
 
                     // Renderizado de modelos por habitacion
                     IRoomAssets roomTypeInstance = RoomFactory.Create(roomData.Value.Type);
@@ -274,12 +347,18 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                 }
             }
 
-            // Crear suelo
-            // TODO: REVISAR PARA COMPLETAR EL LARGO DE TODAS LAS HABITACIONES - GRILLA DE 15x27
-            float gridWidth = 3 * (baseRoomWidth * 2f + roomGap); // Ancho de la 3 habitaciones
-            float gridDepth = 3 * (baseRoomDepth * 2f + roomGap); // Profundidad de las 3 habitaciones
+            // Terminada la generacion de las habitaciones genero los pasillos
+            HallwayGeneratorHelper.GenerateHallways(
+                mapLayout, doorRegistry, graphicsDevice, content, effect,
+                startWorldX, startWorldZ, baseRoomWidth, baseRoomDepth, roomHeight, roomGap, cellSize,
+                rooms, models, modelCache, rng, occupiedAreas
+            );
 
-            // Gran tamaño para el suelo alrededor
+            // Cols y Rows es el length de mapLayout
+            float gridWidth = cols * (baseRoomWidth * 2f + roomGap);
+            float gridDepth = rows * (baseRoomDepth * 2f + roomGap);
+
+            // Gran tamaño para el suelo
             float groundMargin = 4000f;
             var groundResult = GroundBuilderHelper.Create(
                     graphicsDevice,
@@ -291,27 +370,211 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             groundIndexBuffer = groundResult.GroundIndexBuffer;
             groundPrimitiveCount = groundResult.PrimitiveCount;
 
-            // Cantidad de arboles y escala
+            // Generacion de arboles, con la cantidad a generar y la escala del modelo
             int treeCount = 300;
             float treeScale = 0.1f;
 
             var treeModel = content.Load<Model>("Models/World/PSX_Low_Poly_Tree");
             ApplyCustomEffectToModel(treeModel, effect);
 
-            for (int i = 0; i < treeCount; i++)
+            int placedTrees = 0;
+            int attempts = 0;
+            while (placedTrees < treeCount && attempts < treeCount * 10)
             {
+                attempts++;
                 // Valor entre 0 y 1 para generar las distancias de los arboles
                 float x = (float)(rng.NextDouble() * (gridWidth + groundMargin * 2) - (gridWidth * 0.5f + groundMargin));
                 float z = (float)(rng.NextDouble() * (gridDepth + groundMargin * 2) - (gridDepth * 0.5f + groundMargin));
 
-                // Randomizo la rotacion en Y y con valores aleatorios entre 0 y 1
-                float rotY = MathHelper.ToRadians((float)rng.NextDouble() * 360f);
+                var treeBox = new BoundingBox(new Vector3(x - 5f, -10f, z - 5f), new Vector3(x + 5f, 200f, z + 5f));
+                bool collides = false;
+                // Verifico con las habitaciones y pasillos ya generados para no poner los arboles dentro
+                foreach (var box in occupiedAreas)
+                {
+                    if (box.Intersects(treeBox)) 
+                    { 
+                        collides = true; 
+                        break; 
+                    }
+                }
 
-                var world = Matrix.CreateScale(treeScale) * Matrix.CreateRotationY(rotY) *
-                    Matrix.CreateTranslation(x, -1f, z); // Mismo nivel que el suelo -> revisar Draw para el suelo
-
-                trees.Add((treeModel, world, "World/PSX_Low_Poly_Tree"));
+                if (!collides)
+                {
+                    // Randomizo la rotacion en Y y con valores aleatorios entre 0 y 1
+                    float rotY = MathHelper.ToRadians((float)rng.NextDouble() * 360f);
+                    var world = Matrix.CreateScale(treeScale) * Matrix.CreateRotationY(rotY) * Matrix.CreateTranslation(x, -1f, z);
+                    trees.Add((treeModel, world, "World/PSX_Low_Poly_Tree"));
+                    placedTrees++;
+                }
             }
+        }
+
+        private static void RegisterDoor(Dictionary<(int, int), List<HallwayDirection>> registry, int z, int x, HallwayDirection direction)
+        {
+            if (!registry.ContainsKey((z, x)))
+                registry[(z, x)] = new List<HallwayDirection>();
+
+            if (!registry[(z, x)].Contains(direction))
+                registry[(z, x)].Add(direction);
+        }
+
+        /// <summary>
+        /// Coloca el modelo 3D de una puerta en el mundo. 
+        /// Se debe evitar colocar dos puertas en el mismo marco cuando dos habitaciones se conectan.
+        /// </summary>
+        private static void PlaceDoorModel(
+            WallOpening opening,
+            Vector3 localPos,
+            float rotY,
+            int zFirstRoom, int xFirstRoom, int zSecondRoom, int xSecondRoom, // Coordenadas de las dos habitaciones que se conectan
+            HashSet<string> placedDoors,    // Registro de puertas ya colocadas para evitar duplicados
+            float mergedWorldX,             // Posicion del centro X de la habitacion en el mundo
+            float mergedWorldZ,             // Posición del centro Z de la habitacion en el mundo
+            Model doorModel,                // Modelo de la puerta
+            string doorPath,                // Path del modelo
+            List<(Model, Matrix, string)> models) // La lista de modelos a renderizar
+        {
+            // Si no es una puerta, no se hace nada
+            if (opening.Type != WallType.Door) return;
+
+            // Creo un key con las coordenadas de las habitaciones para corroborar el valor y de esta forma no generar un nuevo modelo donde ya exista uno
+            string key = $"{
+                Math.Min(zFirstRoom, zSecondRoom)}_{Math.Min(xFirstRoom, xSecondRoom)}_{Math.Max(zFirstRoom, zSecondRoom)}_{Math.Max(xFirstRoom, xSecondRoom)
+            }";
+
+            // Si la key ya existe entonces, ya se genero el modelo anteriormente, no se hace nada
+            if (placedDoors.Contains(key)) return;
+
+            // Si no existia antes, la agrego al registro de puertas para que no se vuelva a crear el modelo
+            placedDoors.Add(key);
+
+            Vector3 modelOffset = new Vector3(0f, 0f, 0f);
+            Vector3 worldPos = new Vector3(mergedWorldX, 0f, mergedWorldZ) + localPos;
+
+            Matrix doorWorld =
+                Matrix.CreateScale(0.4f) *      // Escalo el modelo para que entre en las aberturas de las puertas correctamente
+                Matrix.CreateRotationY(rotY) *  // Roto la puerta para que encaje en la pared
+                Matrix.CreateTranslation(worldPos + Vector3.Transform(modelOffset, Matrix.CreateRotationY(rotY)));  // Posicion final con el offset rotado
+
+            // Agrero el modelo de la puerta a models para renderizarlo con el resto de modelos
+            models.Add((doorModel, doorWorld, doorPath));
+        }
+
+        /// <summary>
+        /// Construye colisiones las paredes de una habitación o pasillo.
+        /// </summary>
+        public static void AddWallColliders(Vector3 center, float halfWidth, float halfDepth, float height,
+            WallOpening front, WallOpening back, WallOpening left, WallOpening right)
+        {
+            // Grosor de la pared de colision
+            float thick = 2f;
+
+            // Pared Frontal: corre a lo largo del eje X (isAlignedX = true). Offset normal.
+            GenerateAABB(center, new Vector3(center.X, 0, center.Z + halfDepth), true, halfWidth, height, front, thick, false);
+
+            // Pared Trasera: corre a lo largo del eje X. 
+            // invertOffset = true porque la pared esta en el extremo negativo de Z, espejando la vista.
+            GenerateAABB(center, new Vector3(center.X, 0, center.Z - halfDepth), true, halfWidth, height, back, thick, true);
+
+            // Pared Izquierda: corre a lo largo del eje Z (isAlignedX = false). Offset normal.
+            GenerateAABB(center, new Vector3(center.X - halfWidth, 0, center.Z), false, halfDepth, height, left, thick, false);
+
+            // Pared Derecha: corre a lo largo del eje Z.
+            // invertOffset = true porque esta en el extremo positivo de X, espejando la vista respecto a la izquierda.
+            GenerateAABB(center, new Vector3(center.X + halfWidth, 0, center.Z), false, halfDepth, height, right, thick, true);
+        }
+
+        /// <summary>
+        /// Genera las cajas de colisiones AABB para una pared.
+        /// Se divide en partes si tiene una puerta o ventana.
+        /// </summary>
+        private static void GenerateAABB(Vector3 roomCenter, Vector3 wallCenter, bool isAlignedX, float halfLength, float height, WallOpening opening, float thick, bool invertOffset)
+        {
+            // Si es Empty no se genera colision
+            if (opening.Type == WallType.Empty) return;
+
+            // Si es Solid, creo una caja grande para la colision de la pared
+            if (opening.Type == WallType.Solid)
+            {
+                if (isAlignedX) // Pared horizontal (eje X)
+                    WallColliders.Add(
+                        new BoundingBox(
+                            new Vector3(wallCenter.X - halfLength, 0, wallCenter.Z - thick), 
+                            new Vector3(wallCenter.X + halfLength, height, wallCenter.Z + thick)
+                        )
+                    );
+                else            // Pared vertical   (eje Z)
+                    WallColliders.Add(
+                        new BoundingBox(
+                            new Vector3(wallCenter.X - thick, 0, wallCenter.Z - halfLength), 
+                            new Vector3(wallCenter.X + thick, height, wallCenter.Z + halfLength)
+                        )
+                    );
+                return; // Terminamos aquí para esta pared.
+            }
+
+            // Paredes con puertas
+            // El agujero de la puerta no debe de ser mas grande que la pared
+            float holeWidth = MathHelper.Clamp(opening.Width, 1f, halfLength * 2f - 1f);
+            float holeHeight = MathHelper.Clamp(opening.Height, 1f, height - 1f);
+
+            // Si es la pared de atrás o derecha, invertimos el offset para que la física (invisible) 
+            // coincida exactamente con el hueco del modelo 3D (visible).
+            float offset = invertOffset ? -opening.Offset : opening.Offset;
+
+            // Con respecto al centro me fijo donde arranca y termina el hueco de la puerta
+            float holeMin = offset - holeWidth * 0.5f;
+            float holeMax = offset + holeWidth * 0.5f;
+
+            // Colision a la izquierda de la puerta
+            // Se crea si el hueco no empieza pegado al borde izquierdo de la pared
+            if (holeMin > -halfLength)
+            {
+                if (isAlignedX)
+                {
+                    WallColliders.Add(
+                        new BoundingBox(new Vector3(
+                            wallCenter.X - halfLength, 0, wallCenter.Z - thick), 
+                            new Vector3(wallCenter.X + holeMin, height, wallCenter.Z + thick)
+                        )
+                    );
+                }                    
+                else
+                {
+                    WallColliders.Add(
+                        new BoundingBox(
+                            new Vector3(wallCenter.X - thick, 0, wallCenter.Z - halfLength), 
+                            new Vector3(wallCenter.X + thick, height, wallCenter.Z + holeMin)
+                        )
+                    );
+                }                    
+            }
+
+            // Colision a la derecha de la puerta
+            // Se crea si el hueco no empieza pegado al borde derecho de la pared
+            if (holeMax < halfLength)
+            {
+                if (isAlignedX)
+                {
+                    WallColliders.Add
+                        (new BoundingBox(
+                            new Vector3(wallCenter.X + holeMax, 0, wallCenter.Z - thick), 
+                            new Vector3(wallCenter.X + halfLength, height, wallCenter.Z + thick)
+                        )
+                    );
+                }
+                else
+                {
+                    WallColliders.Add(
+                        new BoundingBox(
+                            new Vector3(wallCenter.X - thick, 0, wallCenter.Z + holeMax), 
+                            new Vector3(wallCenter.X + thick, height, wallCenter.Z + halfLength)
+                        )
+                    );
+                }
+            }
+
+            // No creo una colision para la parte superior de la puerta para que no provoque problemas al pasar por la misma
         }
     }
 }
