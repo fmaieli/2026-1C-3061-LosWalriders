@@ -17,7 +17,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
         private float _roamSpeed = 80f;                         // Velocidad normal
         private float _chaseSpeed = 120f;                       // Velocidad persiguiendo al jugador
         private float _visionRadius = 400f;                     // Radio de vision
-        private float _visionConeAngle = MathHelper.PiOver4;    // Cono de vision
+        private float _visionConeAngle = MathHelper.PiOver4;    // Cono de vision = 45° -> 45 a la izquierda y 45 a la derecha = 90° el cono de vision actual
         private float _catchRadius = 25f;
 
         // Tiempos
