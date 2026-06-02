@@ -15,6 +15,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
         // Lista con todas las colisiones posibles, usada para que el jugador y el enemigo no traspasen paredes
         public static List<BoundingBox> WallColliders { get; } = new List<BoundingBox>();
 
+        // Lista con los centros de las habitaciones para que reaparezca el enemigo
+        public static List<Vector3> ValidSpawnPoints { get; } = new List<Vector3>();
+
         /// <summary>
         /// Reemplaza el material por defecto de los modelos con un material personalizado
         /// </summary>
@@ -76,6 +79,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
         {
             // Elimino las colisiones anteriores por precaucion
             WallColliders.Clear();
+            ValidSpawnPoints.Clear();
 
             string doorPath = "Items/PSX_Door";
 
@@ -225,6 +229,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     // Centro exacto en el mundo 3D
                     float mergedWorldX = startWorldX + (x + (widthCells - 1) / 2f) * cellStepX;
                     float mergedWorldZ = startWorldZ + (z + (heightCells - 1) / 2f) * cellStepZ;
+
+                    // Guardo el centro como un valor valido de spawn para el enemigo
+                    ValidSpawnPoints.Add(new Vector3(mergedWorldX, 0f, mergedWorldZ));
 
                     occupiedAreas.Add(new BoundingBox(
                         new Vector3(mergedWorldX - mergedWidthHalf, -10f, mergedWorldZ - mergedDepthHalf),

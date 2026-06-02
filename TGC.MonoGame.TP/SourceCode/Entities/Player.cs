@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System.Diagnostics;
 using TGC.MonoGame.TP.SourceCode.Components;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities
@@ -95,7 +96,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             var mouseState = Mouse.GetState();
             float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            // 1. Manejo de Toggles (Estados)
+            // Manejo de Toggles
             HandleToggles(keyboardState);
 
             nokiaLight?.Update(elapsedTime);
@@ -172,6 +173,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                 keyboardState.IsKeyDown(Keys.F) &&
                 _previousKeyboardState.IsKeyUp(Keys.F))
             {
+                Debug.WriteLine("FreeCamera On!");
                 _freeCameraMode = !_freeCameraMode;
                 // Desactivo NoClip para que no haga las 2 cosas al mismo tiempo
                 if (_freeCameraMode) _noClipMode = false;
@@ -183,6 +185,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                 keyboardState.IsKeyDown(Keys.C) &&
                 _previousKeyboardState.IsKeyUp(Keys.C))
             {
+                Debug.WriteLine("NoClip On!");
                 _noClipMode = !_noClipMode;
                 // Desactivo FreeCamera
                 if (_noClipMode) _freeCameraMode = false;

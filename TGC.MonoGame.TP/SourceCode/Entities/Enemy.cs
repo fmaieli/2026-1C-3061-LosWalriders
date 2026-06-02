@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Helpers;
@@ -12,7 +13,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
     {
         public Vector3 Position { get; set; }
         public Vector3 Forward { get; private set; } = Vector3.Forward;
-        public EnemyState State { get; private set; } = EnemyState.Cooldown;
+        public EnemyState State { get; private set; } = EnemyState.Roaming;
 
         private float _roamSpeed = 80f;                         // Velocidad normal
         private float _chaseSpeed = 120f;                       // Velocidad persiguiendo al jugador
@@ -21,8 +22,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
         private float _catchRadius = 25f;
 
         // Tiempos
-        private float _cooldownTimer = 0f;          // Enunciado Entrega 2: Pasado un tiempo arbitrario que consideren justo, este enemigo volverá a modo recorrido.
-        private float _cooldownDuration = 15f;
+        private float _cooldownTimer = 5f;          // Enunciado Entrega 2: Pasado un tiempo arbitrario que consideren justo, este enemigo volverá a modo recorrido.
+        private float _cooldownDuration = 5f;
         private float _changeDirectionTimer = 0f;   // Se usa para poder ir cambiando la direccion en la que el enemigo camina
 
         // Variables del modelo y efecto
@@ -79,6 +80,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                     _cooldownTimer -= elapsedTime;
                     if (_cooldownTimer <= 0f)
                     {
+                        RespawnNearby(playerPosition);
                         State = EnemyState.Roaming;
                     }
                     break;
@@ -183,6 +185,46 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             State = EnemyState.Cooldown;
             _cooldownTimer = _cooldownDuration;
             Position = new Vector3(0, -1000f, 0);
+        }
+
+        private void RespawnNearby(Vector3 playerPos)
+        {
+            if (LevelGeneratorHelper.ValidSpawnPoints.Count == 0) return;
+
+            Random rng = new Random();
+            List<Vector3> candidateSpawns = new List<Vector3>();
+
+            // Filtramos las habitaciones para encontrar las que están a una distancia media
+            foreach (var spawnPoint in LevelGeneratorHelper.ValidSpawnPoints)
+            {
+                float distanceToPlayer = Vector3.Distance(spawnPoint, playerPos);
+
+                // Considero los spawn validos entre los 500 y 1200 unidades de distancia
+                if (distanceToPlayer >= 400f && distanceToPlayer <= 800f)
+                {
+                    candidateSpawns.Add(spawnPoint);
+                }
+            }
+
+            Vector3 chosenSpawn;
+
+            if (candidateSpawns.Count > 0)
+            {
+                // Se elije al azar la habitacion de spawn
+                chosenSpawn = candidateSpawns[rng.Next(candidateSpawns.Count)];
+            }
+            else
+            {
+                // En caso de que no tenga opciones tomo todos los puntos validos y randomizo para tomar uno
+                chosenSpawn = LevelGeneratorHelper.ValidSpawnPoints[rng.Next(LevelGeneratorHelper.ValidSpawnPoints.Count)];
+            }
+
+            // Offset entre -50 y 50 para que sea un poco mas randomizado
+            float offsetX = (float)(rng.NextDouble() * 100f - 50f);
+            float offsetZ = (float)(rng.NextDouble() * 100f - 50f);
+
+            Debug.WriteLine("Barney se volvio a generar!");
+            Position = new Vector3(chosenSpawn.X + offsetX, 50f, chosenSpawn.Z + offsetZ);
         }
 
         // Misma logica que en Player para verificar si esta colisionando con las paredes
