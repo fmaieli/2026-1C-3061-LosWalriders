@@ -159,7 +159,8 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     if (roomTypeInstance != null)
                     {
                         var placements = ModelPlacementOnRoomHelper.GeneratePlacements(roomTypeInstance, mergedWidthHalf, mergedDepthHalf, cellSize, rng.Next());
-                        foreach (var (modelPath, localPos) in placements)
+
+                        foreach (var (modelPath, localPos, rotationY) in placements)
                         {
                             if (!modelCache.TryGetValue(modelPath, out var model))
                             {
@@ -167,7 +168,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                                 LevelGeneratorHelper.ApplyCustomEffectToModel(model, effect);
                                 modelCache[modelPath] = model;
                             }
-                            models.Add((model, Matrix.CreateScale(0.5f) * Matrix.CreateTranslation(mergedWorldX + localPos.X, localPos.Y, mergedWorldZ + localPos.Z), modelPath));
+
+                            Matrix modelWorld = Matrix.CreateScale(0.5f) * Matrix.CreateRotationY(rotationY) * Matrix.CreateTranslation(mergedWorldX + localPos.X, localPos.Y, mergedWorldZ + localPos.Z);
+                            models.Add((model, modelWorld, modelPath));
                         }
                     }
                 }

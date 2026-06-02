@@ -329,7 +329,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                             seed: rng.Next()
                         );
 
-                        foreach (var (modelPath, localPos) in placements)
+                        foreach (var (modelPath, localPos, rotationY) in placements)
                         {
                             // Utilizo el diccionario para poder reutilizar elementos que ya se hayan guardado
                             if (!modelCache.TryGetValue(modelPath, out var model))
@@ -340,7 +340,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                             }
 
                             // Posicion final de los modelos / Se achican a la mitad los modelos porque muchos son realmente grandes
-                            var modelWorld = Matrix.CreateScale(0.5f) * Matrix.CreateTranslation(roomWorld.Translation + localPos);
+                            Matrix modelWorld = Matrix.CreateScale(0.5f) * Matrix.CreateRotationY(rotationY) * Matrix.CreateTranslation(roomWorld.Translation + localPos);
                             models.Add((model, modelWorld, modelPath));
                         }
                     }
