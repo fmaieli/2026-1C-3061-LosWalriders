@@ -12,7 +12,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Types
 
         public List<string> Assets { get; } = new();
 
-        public List<(string ModelPath, Vector3 Position)> SpawnedModels { get; private set; } = new();
+        public List<(string ModelPath, Vector3 Position, float RotationY)> SpawnedModels { get; private set; } = new();
 
         public void Generate(float width, float depth, float cellSize, int seed)
         {

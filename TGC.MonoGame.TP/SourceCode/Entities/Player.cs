@@ -2,6 +2,8 @@
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System.Diagnostics;
+using TGC.MonoGame.TP.SourceCode.Components;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities
 {
@@ -10,36 +12,44 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
         public Vector3 Position { get; private set; } = new Vector3(0, 50, 150);
         public float Rotation { get; private set; } = 0f;
 
-        // Variables de camara Free (para debuguear y ver rapidamente el nivel generado)
+        // Variables de camara Free y No Clip (para debuguear)
         private float _cameraPitch = 0f;
         private bool _freeCameraMode = false;
+        private bool _noClipMode = false;
+
         private KeyboardState _previousKeyboardState;
         private MouseState _previousMouseState;
 
         public Matrix View { get; private set; }
 
         private Model _armsModel;
-
         private Effect _armsEffect;
+
+        private LightSource nokiaLight;
+        private LightSource matchLight;
 
         public void LoadContent(ContentManager content, Effect effect)
         {
             _armsEffect = content.Load<Effect>("Effects/ArmsShader");
             _armsModel = content.Load<Model>("Models/Player/PSX_Player_Arms");
 
-            // Se aplica Clone a todas las partes del mesh para aplicarle el custom effect
             foreach (var mesh in _armsModel.Meshes)
             {
                 foreach (var part in mesh.MeshParts)
                     part.Effect = _armsEffect.Clone();
             }
+
+            nokiaLight = new NokiaLight();
+            matchLight = new MatchLight();
+
+            nokiaLight.LoadContent(content, effect);
+            matchLight.LoadContent(content, effect);
         }
 
         public void DrawArms(Matrix view, Matrix projection, GraphicsDevice graphicsDevice)
         {
             if (_armsModel == null) return;
 
-            // Huesos del modelo
             var bones = new Matrix[_armsModel.Bones.Count];
             _armsModel.CopyAbsoluteBoneTransformsTo(bones);
 
@@ -47,7 +57,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             Matrix cameraWorld = Matrix.Invert(view);
 
             // Busco el lugar donde quede correctamente el modelo
-            Vector3 offset = new Vector3(-30f, -5f, -32f);
+            Vector3 armsOffset = new Vector3(-30f, -5f, -32f);
 
             foreach (var mesh in _armsModel.Meshes)
             {
@@ -59,7 +69,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                     Matrix.CreateScale(0.9f) *
                     centerOffset *
                     rotation *
-                    Matrix.CreateTranslation(offset) *
+                    Matrix.CreateTranslation(armsOffset) *
                     cameraWorld;
 
                 foreach (var part in mesh.MeshParts)
@@ -74,22 +84,23 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
 
                 mesh.Draw();
             }
+
+            // Dibujo los objetos de luz
+            nokiaLight?.Draw(view, projection, cameraWorld);
+            matchLight?.Draw(view, projection, cameraWorld);
         }
 
         public void Update(GameTime gameTime)
         {
             var keyboardState = Keyboard.GetState();
             var mouseState = Mouse.GetState();
-
-            if (keyboardState.IsKeyDown(Keys.LeftControl) &&
-                keyboardState.IsKeyDown(Keys.LeftShift) &&
-                keyboardState.IsKeyDown(Keys.F) &&
-                _previousKeyboardState.IsKeyUp(Keys.F))
-            {
-                _freeCameraMode = !_freeCameraMode;
-            }
-
             float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            // Manejo de Toggles
+            HandleToggles(keyboardState);
+
+            nokiaLight?.Update(elapsedTime);
+            matchLight?.Update(elapsedTime);
 
             // En FreeCamera la velocidad es el doble
             float moveSpeed = _freeCameraMode ? 600f : 300f;
@@ -109,7 +120,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             }
             _previousMouseState = mouseState;
 
-            // Rotacion de la camara para modo normal
+            // Rotacion de la camara para modo normal con el teclado
             if (keyboardState.IsKeyDown(Keys.Left)) Rotation += turnSpeed * elapsedTime;
             if (keyboardState.IsKeyDown(Keys.Right)) Rotation -= turnSpeed * elapsedTime;
 
@@ -118,45 +129,130 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             {
                 if (keyboardState.IsKeyDown(Keys.Up)) _cameraPitch += turnSpeed * elapsedTime;
                 if (keyboardState.IsKeyDown(Keys.Down)) _cameraPitch -= turnSpeed * elapsedTime;
-
-                // Limitamos el pitch para no dar una vuelta completa
-                _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
             }
 
-            // Movimiento vertical
-            if (_freeCameraMode)
-            {
-                // Subir y bajar en el eje Y
-                if (keyboardState.IsKeyDown(Keys.E)) Position += Vector3.Up * moveSpeed * elapsedTime;
-                if (keyboardState.IsKeyDown(Keys.Q)) Position -= Vector3.Up * moveSpeed * elapsedTime;
-            }
-            else
-            {
-                // En modo normal, el jugador se queda al ras del suelo, se reinicia la posicion
-                Position = new Vector3(Position.X, 50f, Position.Z);
-            }
+            // Limitamos el pitch para no dar una vuelta completa
+            _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
 
+            // Vectores de direccion
             Matrix cameraRotation = Matrix.CreateFromYawPitchRoll(Rotation, _cameraPitch, 0f);
             Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
             Vector3 right = Vector3.Transform(Vector3.Right, cameraRotation);
 
-            // Mirar hacia arriba y hacia abajo pero manteniendo la misma altura
+            // Mirar hacia arriba y hacia abajo pero manteniendo la misma altura en el plano XZ
             forward.Y = 0f;
             right.Y = 0f;
-            // Normalizo los vectores para que no se note la diferencia de velocidad al mirar hacia arriba o abajo
             forward.Normalize();
             right.Normalize();
 
-            if (keyboardState.IsKeyDown(Keys.W)) Position += forward * moveSpeed * elapsedTime;
-            if (keyboardState.IsKeyDown(Keys.S)) Position -= forward * moveSpeed * elapsedTime;
-            if (keyboardState.IsKeyDown(Keys.A)) Position -= right * moveSpeed * elapsedTime;
-            if (keyboardState.IsKeyDown(Keys.D)) Position += right * moveSpeed * elapsedTime;
+            Vector3 movement = Vector3.Zero;
+            if (keyboardState.IsKeyDown(Keys.W)) movement += forward * moveSpeed * elapsedTime;
+            if (keyboardState.IsKeyDown(Keys.S)) movement -= forward * moveSpeed * elapsedTime;
+            if (keyboardState.IsKeyDown(Keys.A)) movement -= right * moveSpeed * elapsedTime;
+            if (keyboardState.IsKeyDown(Keys.D)) movement += right * moveSpeed * elapsedTime;
 
-            // Anteriormente UpdateViewMatrix
+            // Separo los tipos de modo de movimiento del jugador
+            if (_freeCameraMode || _noClipMode)
+            {
+                ApplyDebugMovement(keyboardState, movement, moveSpeed, elapsedTime);
+            }
+            else
+            {
+                ApplyNormalMovement(movement);
+            }
+
             View = Matrix.CreateLookAt(Position, Position + Vector3.Transform(Vector3.Forward, cameraRotation), Vector3.Up);
-
-            // Guardado del estado del teclado para proximo frame - toggle de teclas
             _previousKeyboardState = keyboardState;
+        }
+
+        private void HandleToggles(KeyboardState keyboardState)
+        {
+            // Free Camera (Ctrl + Shift + F)
+            if (keyboardState.IsKeyDown(Keys.LeftControl) &&
+                keyboardState.IsKeyDown(Keys.LeftShift) &&
+                keyboardState.IsKeyDown(Keys.F) &&
+                _previousKeyboardState.IsKeyUp(Keys.F))
+            {
+                Debug.WriteLine("FreeCamera On!");
+                _freeCameraMode = !_freeCameraMode;
+                // Desactivo NoClip para que no haga las 2 cosas al mismo tiempo
+                if (_freeCameraMode) _noClipMode = false;
+            }
+
+            // NoClip (Ctrl + Shift + C)
+            if (keyboardState.IsKeyDown(Keys.LeftControl) &&
+                keyboardState.IsKeyDown(Keys.LeftShift) &&
+                keyboardState.IsKeyDown(Keys.C) &&
+                _previousKeyboardState.IsKeyUp(Keys.C))
+            {
+                Debug.WriteLine("NoClip On!");
+                _noClipMode = !_noClipMode;
+                // Desactivo FreeCamera
+                if (_noClipMode) _freeCameraMode = false;
+            }
+
+            // Nokia (Tecla 1)
+            if (keyboardState.IsKeyDown(Keys.D1) && _previousKeyboardState.IsKeyUp(Keys.D1))
+            {
+                nokiaLight?.Toggle();
+                if (nokiaLight.IsActive && matchLight != null) matchLight.IsActive = false;
+            }
+
+            // Fosforo (Tecla 2)
+            if (keyboardState.IsKeyDown(Keys.D2) && _previousKeyboardState.IsKeyUp(Keys.D2))
+            {
+                matchLight?.Toggle();
+                if (matchLight.IsActive && nokiaLight != null) nokiaLight.IsActive = false;
+            }
+        }
+
+        private void ApplyDebugMovement(KeyboardState keyboardState, Vector3 movement, float moveSpeed, float elapsedTime)
+        {
+            // FreeCamera
+            if (_freeCameraMode)
+            {
+                // Ascenso y descenso
+                if (keyboardState.IsKeyDown(Keys.E)) Position += Vector3.Up * moveSpeed * elapsedTime;
+                if (keyboardState.IsKeyDown(Keys.Q)) Position -= Vector3.Up * moveSpeed * elapsedTime;
+
+                Position += movement;
+
+                // Evitamos atravesar el piso
+                if (Position.Y < 10f) Position = new Vector3(Position.X, 10f, Position.Z);
+            }
+            // NoClip
+            else if (_noClipMode)
+            {
+                // El jugador siempre se mantiene pegado al suelo
+                Position = new Vector3(Position.X, 50f, Position.Z);
+                Position += movement;
+            }
+        }
+
+        private void ApplyNormalMovement(Vector3 movement)
+        {
+            // El jugador siempre se mantiene pegado al suelo en modo normal
+            Position = new Vector3(Position.X, 50f, Position.Z);
+
+            Vector3 newPosX = new Vector3(Position.X + movement.X, Position.Y, Position.Z);
+            if (!IsColliding(newPosX)) Position = newPosX;
+
+            Vector3 newPosZ = new Vector3(Position.X, Position.Y, Position.Z + movement.Z);
+            if (!IsColliding(newPosZ)) Position = newPosZ;
+        }
+
+        private bool IsColliding(Vector3 targetPosition)
+        {
+            BoundingSphere playerSphere = new BoundingSphere(targetPosition, 10f);
+
+            foreach (var box in Helpers.LevelGeneratorHelper.WallColliders)
+            {
+                if (playerSphere.Intersects(box))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

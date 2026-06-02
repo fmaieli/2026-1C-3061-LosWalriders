@@ -35,6 +35,7 @@ public class TGCGame : Game
     private readonly List<(Model Model, Matrix World, string Name)> _models = new();
 
     private readonly Player _player = new();
+    private readonly Enemy _enemy = new();
 
     private VertexBuffer _groundVertexBuffer;
     private IndexBuffer _groundIndexBuffer;
@@ -57,7 +58,7 @@ public class TGCGame : Game
         // Carpeta raiz donde va a estar toda la Media.
         Content.RootDirectory = "Content";
         // Hace que el mouse sea visible.
-        IsMouseVisible = true;
+        IsMouseVisible = false;
     }
 
     /// <summary>
@@ -101,6 +102,11 @@ public class TGCGame : Game
 
         _player.LoadContent(Content, _effect);
 
+        _enemy.LoadContent(Content, _effect);
+        // En un principio dibujo el enemigo cerca para comprobar que este funcionando correctamente
+        // Revisar donde deberia de spawnear dentro del mapa
+        _enemy.Position = _player.Position + new Vector3(0, 0, -250f);
+
         // Delegamos TODA la generacion del nivel al Helper
         LevelGeneratorHelper.GenerateLevel(
             GraphicsDevice,
@@ -118,7 +124,7 @@ public class TGCGame : Game
 
         Window.Title = $"TGC.MonoGame.TP - Models: {_models.Count + _trees.Count}";
 
-        base.LoadContent();
+        base.LoadContent();   
     }
 
     /// <summary>
@@ -132,6 +138,7 @@ public class TGCGame : Game
             Exit();
 
         _player.Update(gameTime);
+        _enemy.Update(gameTime, _player.Position);
         _view = _player.View;
 
         base.Update(gameTime);
@@ -215,6 +222,9 @@ public class TGCGame : Game
 
         // Dibujado de brazos para el jugador
         _player.DrawArms(_view, _projection, GraphicsDevice);
+
+        // Dibujado de enemigo
+        _enemy.Draw(_view, _projection);
 
         base.Draw(gameTime);
     }

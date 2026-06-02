@@ -132,7 +132,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
             holeH = MathHelper.Clamp(holeH, 1f, wallHeight - 1f); // Alto de opening
 
             // Distancia desde donde empieza la pared hasta el borde del 'agujero'
-            float holeLeft = (wallWidth - holeW) * 0.5f; 
+            float holeLeft = (wallWidth - holeW) * 0.5f + opening.Offset;
             float holeBottom = (opening.Type == WallType.Window) // Centrar verticalmente el hueco de la ventana
                 ? (wallHeight - holeH) * 0.5f
                 : 0f; // Es una puerta y arranca desde abajo el 'agujero'
