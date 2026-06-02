@@ -133,10 +133,9 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
             Vector3 right = Vector3.Transform(Vector3.Right, cameraRotation);
 
-            // Mirar hacia arriba y hacia abajo pero manteniendo la misma altura
+            // Mirar hacia arriba y hacia abajo pero manteniendo la misma altura en el plano XZ
             forward.Y = 0f;
             right.Y = 0f;
-            // Normalizo los vectores para que no se note la diferencia de velocidad al mirar hacia arriba o abajo
             forward.Normalize();
             right.Normalize();
 
@@ -146,8 +145,15 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             if (keyboardState.IsKeyDown(Keys.A)) movement -= right * moveSpeed * elapsedTime;
             if (keyboardState.IsKeyDown(Keys.D)) movement += right * moveSpeed * elapsedTime;
 
-            // Debug
-            DebugMovementMode(keyboardState, forward, right, moveSpeed, elapsedTime);
+            // Separo los tipos de modo de movimiento del jugador
+            if (_freeCameraMode || _noClipMode)
+            {
+                ApplyDebugMovement(keyboardState, movement, moveSpeed, elapsedTime);
+            }
+            else
+            {
+                ApplyNormalMovement(movement);
+            }
 
             View = Matrix.CreateLookAt(Position, Position + Vector3.Transform(Vector3.Forward, cameraRotation), Vector3.Up);
             _previousKeyboardState = keyboardState;
@@ -162,6 +168,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                 _previousKeyboardState.IsKeyUp(Keys.F))
             {
                 _freeCameraMode = !_freeCameraMode;
+                // Desactivo NoClip para que no haga las 2 cosas al mismo tiempo
+                if (_freeCameraMode) _noClipMode = false;
             }
 
             // NoClip (Ctrl + Shift + C)
@@ -171,6 +179,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                 _previousKeyboardState.IsKeyUp(Keys.C))
             {
                 _noClipMode = !_noClipMode;
+                // Desactivo FreeCamera
+                if (_noClipMode) _freeCameraMode = false;
             }
 
             // Luz (Tecla 1)
@@ -180,10 +190,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             }
         }
 
-        private void DebugMovementMode(KeyboardState keyboardState, Vector3 forward, Vector3 right, float moveSpeed, float elapsedTime)
+        private void ApplyDebugMovement(KeyboardState keyboardState, Vector3 movement, float moveSpeed, float elapsedTime)
         {
-            Vector3 movement = Vector3.Zero;
-            
             // FreeCamera
             if (_freeCameraMode)
             {
@@ -197,25 +205,24 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                 if (Position.Y < 10f) Position = new Vector3(Position.X, 10f, Position.Z);
             }
             // NoClip
-            else
+            else if (_noClipMode)
             {
                 // El jugador siempre se mantiene pegado al suelo
                 Position = new Vector3(Position.X, 50f, Position.Z);
-
-                if (_noClipMode)
-                {
-                    // NoClip ignora la validación de paredes
-                    Position += movement;
-                }
-                else
-                {
-                    Vector3 newPosX = new Vector3(Position.X + movement.X, Position.Y, Position.Z);
-                    if (!IsColliding(newPosX)) Position = newPosX;
-
-                    Vector3 newPosZ = new Vector3(Position.X, Position.Y, Position.Z + movement.Z);
-                    if (!IsColliding(newPosZ)) Position = newPosZ;
-                }
+                Position += movement;
             }
+        }
+
+        private void ApplyNormalMovement(Vector3 movement)
+        {
+            // El jugador siempre se mantiene pegado al suelo en modo normal
+            Position = new Vector3(Position.X, 50f, Position.Z);
+
+            Vector3 newPosX = new Vector3(Position.X + movement.X, Position.Y, Position.Z);
+            if (!IsColliding(newPosX)) Position = newPosX;
+
+            Vector3 newPosZ = new Vector3(Position.X, Position.Y, Position.Z + movement.Z);
+            if (!IsColliding(newPosZ)) Position = newPosZ;
         }
 
         private bool IsColliding(Vector3 targetPosition)
