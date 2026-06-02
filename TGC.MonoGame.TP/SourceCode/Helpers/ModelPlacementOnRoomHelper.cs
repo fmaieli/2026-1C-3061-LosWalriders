@@ -176,6 +176,21 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     break;
             }
 
+            // Spawn aleatorio de cajas de fosforos
+            if (room.Type != RoomType.Entrance && room.Type != RoomType.Outdoor)
+            {
+                // 40% de chances
+                if (rng.Next(100) < 20)
+                {
+                    int randomCol = rng.Next(cols);
+                    int randomRow = rng.Next(rows);
+
+                    float matchBoxHeight = 0f;
+
+                    Place("Items/PSX_Item_Match_Box", randomCol, randomRow, 0f, matchBoxHeight);
+                }
+            }
+
             return results;
         }
     }
