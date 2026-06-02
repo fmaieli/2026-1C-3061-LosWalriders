@@ -179,7 +179,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             // Spawn aleatorio de cajas de fosforos
             if (room.Type != RoomType.Entrance && room.Type != RoomType.Outdoor)
             {
-                // 40% de chances
+                // 20% de chances
                 if (rng.Next(100) < 20)
                 {
                     int randomCol = rng.Next(cols);
