@@ -4,9 +4,9 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace TGC.MonoGame.TP.SourceCode.Components
 {
-    internal class NokiaFlashlight : LightSource
+    internal class NokiaLight : LightSource
     {
-        public NokiaFlashlight()
+        public NokiaLight()
         {
             MaxDurability = 100f;
             Durability = 100f;

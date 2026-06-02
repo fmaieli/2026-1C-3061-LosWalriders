@@ -12,14 +12,14 @@ namespace TGC.MonoGame.TP.SourceCode.Components
         public float DecayRate { get; protected set; }      // Durabilidad que va perdiendo por segundo
         public float LightIntensity { get; protected set; } // Intensidad de la luz
 
-        public bool IsActive { get; protected set; }
+        public bool IsActive { get; set; }
 
         protected Model Model;
         protected Effect Effect;
 
         public virtual void Toggle()
         {
-            // Solo se puede prender si le queda bateria
+            // Solo se puede prender si le queda carga
             if (Durability > 0)
             {
                 IsActive = !IsActive;
