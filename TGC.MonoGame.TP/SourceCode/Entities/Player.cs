@@ -24,22 +24,25 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
         private Model _armsModel;
         private Effect _armsEffect;
 
-        private LightSource nokiaFlashlight;
+        private LightSource nokiaLight;
+        private LightSource matchLight;
 
         public void LoadContent(ContentManager content, Effect effect)
         {
             _armsEffect = content.Load<Effect>("Effects/ArmsShader");
             _armsModel = content.Load<Model>("Models/Player/PSX_Player_Arms");
 
-            // Se aplica Clone a todas las partes del mesh para aplicarle el custom effect
             foreach (var mesh in _armsModel.Meshes)
             {
                 foreach (var part in mesh.MeshParts)
                     part.Effect = _armsEffect.Clone();
             }
 
-            nokiaFlashlight = new NokiaFlashlight();
-            nokiaFlashlight.LoadContent(content, effect);
+            nokiaLight = new NokiaLight();
+            matchLight = new MatchLight();
+
+            nokiaLight.LoadContent(content, effect);
+            matchLight.LoadContent(content, effect);
         }
 
         public void DrawArms(Matrix view, Matrix projection, GraphicsDevice graphicsDevice)
@@ -81,8 +84,9 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                 mesh.Draw();
             }
 
-            // Dibujo el objeto Nokias
-            nokiaFlashlight?.Draw(view, projection, cameraWorld);
+            // Dibujo los objetos de luz
+            nokiaLight?.Draw(view, projection, cameraWorld);
+            matchLight?.Draw(view, projection, cameraWorld);
         }
 
         public void Update(GameTime gameTime)
@@ -94,7 +98,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             // 1. Manejo de Toggles (Estados)
             HandleToggles(keyboardState);
 
-            nokiaFlashlight?.Update(elapsedTime);
+            nokiaLight?.Update(elapsedTime);
+            matchLight?.Update(elapsedTime);
 
             // En FreeCamera la velocidad es el doble
             float moveSpeed = _freeCameraMode ? 600f : 300f;
@@ -183,10 +188,18 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                 if (_noClipMode) _freeCameraMode = false;
             }
 
-            // Luz (Tecla 1)
+            // Nokia (Tecla 1)
             if (keyboardState.IsKeyDown(Keys.D1) && _previousKeyboardState.IsKeyUp(Keys.D1))
             {
-                nokiaFlashlight?.Toggle();
+                nokiaLight?.Toggle();
+                if (nokiaLight.IsActive && matchLight != null) matchLight.IsActive = false;
+            }
+
+            // Fosforo (Tecla 2)
+            if (keyboardState.IsKeyDown(Keys.D2) && _previousKeyboardState.IsKeyUp(Keys.D2))
+            {
+                matchLight?.Toggle();
+                if (matchLight.IsActive && nokiaLight != null) nokiaLight.IsActive = false;
             }
         }
 
