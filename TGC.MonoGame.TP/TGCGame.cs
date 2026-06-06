@@ -3,6 +3,8 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Collections.Generic;
 using TGC.MonoGame.TP.SourceCode.Entities.Character;
+using TGC.MonoGame.TP.SourceCode.Enums;
+using TGC.MonoGame.TP.SourceCode.Geometries;
 using TGC.MonoGame.TP.SourceCode.Helpers;
 
 namespace TGC.MonoGame.TP;
@@ -42,6 +44,12 @@ public class TGCGame : Game
     private int _groundPrimitiveCount;
 
     private readonly List<(Model Model, Matrix World, string Name)> _trees = new();
+
+    // Post-Processing
+    private RenderTarget2D _sceneRenderTarget;
+    private FullScreenQuad _fullScreenQuad;
+    private Effect _postProcessEffect;
+    private Texture2D _overlayTexture;
 
     /// <summary>
     ///     Constructor del juego.
@@ -124,6 +132,19 @@ public class TGCGame : Game
 
         Window.Title = $"TGC.MonoGame.TP - Models: {_models.Count + _trees.Count}";
 
+        #region Post-Processing
+        _fullScreenQuad = new FullScreenQuad(GraphicsDevice);
+
+        _sceneRenderTarget = new RenderTarget2D(GraphicsDevice,
+            GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height,
+            false, SurfaceFormat.Color, DepthFormat.Depth24, 0, RenderTargetUsage.DiscardContents);
+
+        _postProcessEffect = Content.Load<Effect>(ContentFolderEffects + "TextureMerge");
+
+        _overlayTexture = Content.Load<Texture2D>(ContentFolderTextures + "blood_splash");
+        _postProcessEffect.Parameters["overlayTexture"]?.SetValue(_overlayTexture);
+        #endregion
+
         base.LoadContent();   
     }
 
@@ -150,6 +171,20 @@ public class TGCGame : Game
     /// </summary>
     protected override void Draw(GameTime gameTime)
     {
+        #region Pass 1 - Post-Processing
+        bool applyBloodEffect = _enemy.State == EnemyState.Cooldown;
+
+        if (applyBloodEffect)
+        {
+            GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+            GraphicsDevice.SetRenderTarget(_sceneRenderTarget);
+        }
+        else
+        {
+            GraphicsDevice.SetRenderTarget(null);
+        }
+        #endregion
+
         GraphicsDevice.Clear(Color.White);
 
         // Ya no se fija en VertexBuffer y IndexBuffer sino en la cantidad de habitaciones que existan
@@ -225,6 +260,20 @@ public class TGCGame : Game
 
         // Dibujado de enemigo
         _enemy.Draw(_view, _projection);
+
+        #region Pass 2 - Post-Processing
+        if (applyBloodEffect)
+        {
+            GraphicsDevice.DepthStencilState = DepthStencilState.None;
+            GraphicsDevice.SetRenderTarget(null);
+
+            _postProcessEffect.Parameters["baseTexture"]?.SetValue(_sceneRenderTarget);
+            _postProcessEffect.Parameters["time"]?.SetValue((float)gameTime.TotalGameTime.TotalSeconds);
+            _postProcessEffect.Parameters["intensity"]?.SetValue(_enemy.CooldownIntensity);
+
+            _fullScreenQuad.Draw(_postProcessEffect);
+        }
+        #endregion
 
         base.Draw(gameTime);
     }

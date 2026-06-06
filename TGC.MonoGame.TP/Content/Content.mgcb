@@ -25,6 +25,12 @@
 /processorParam:DebugMode=Auto
 /build:Effects/BasicShader.fx
 
+#begin Effects/TextureMerge.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/TextureMerge.fx
+
 #begin Models/Car/PSX_Fiat1.fbx
 /importer:FbxImporter
 /processor:ModelProcessor
@@ -1219,6 +1225,18 @@
 /processorParam:SwapWindingOrder=False
 /processorParam:TextureFormat=Compressed
 /build:Models/World/PSX_Low_Poly_Tree.fbx;Models/World/PSX_Low_Poly_Tree
+
+#begin Textures/blood_splash.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/blood_splash.png
 
 #begin Textures/old-concrete-wall.jpg
 /importer:TextureImporter
