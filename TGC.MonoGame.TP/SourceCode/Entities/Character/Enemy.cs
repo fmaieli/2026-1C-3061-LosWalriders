@@ -13,7 +13,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
     {
         public Vector3 Position { get; set; }
         public Vector3 Forward { get; private set; } = Vector3.Forward;
-        public EnemyState State { get; private set; } = EnemyState.Roaming;
+        public EnemyState State { get; private set; } = EnemyState.Roaming;        
 
         private float _roamSpeed = 80f;                         // Velocidad normal
         private float _chaseSpeed = 120f;                       // Velocidad persiguiendo al jugador
@@ -98,9 +98,9 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
                     if (Vector3.Distance(Position, playerPosition) < _catchRadius)
                     {
-                        CatchPlayer();
+                        if (!isPlayerHidden) CatchPlayer();
                     }
-                    else if (!CanSeePlayer(playerPosition))
+                    else if (!CanSeePlayer(playerPosition, isPlayerHidden)) 
                     {
                         State = EnemyState.Roaming;
                     }
