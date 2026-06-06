@@ -2,7 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Collections.Generic;
-using TGC.MonoGame.TP.SourceCode.Entities;
+using TGC.MonoGame.TP.SourceCode.Entities.Character;
 using TGC.MonoGame.TP.SourceCode.Helpers;
 
 namespace TGC.MonoGame.TP;
@@ -137,7 +137,7 @@ public class TGCGame : Game
         if (Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
-        _player.Update(gameTime);
+        _player.Update(gameTime, _models);
         _enemy.Update(gameTime, _player.Position);
         _view = _player.View;
 

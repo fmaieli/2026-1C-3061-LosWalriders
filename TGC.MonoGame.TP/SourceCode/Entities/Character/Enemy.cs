@@ -7,7 +7,7 @@ using System.Diagnostics;
 using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Helpers;
 
-namespace TGC.MonoGame.TP.SourceCode.Entities
+namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 {
     internal class Enemy
     {

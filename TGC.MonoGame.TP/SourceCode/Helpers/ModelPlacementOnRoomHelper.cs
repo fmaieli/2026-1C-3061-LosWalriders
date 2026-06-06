@@ -19,7 +19,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             int cols = Math.Max(3, (int)(roomWidth * 2 / cellSize));
             int rows = Math.Max(3, (int)(roomDepth * 2 / cellSize));
 
-            // Centro de la habitación
+            // Centro de la habitacion
             int midC = cols / 2;
             int midR = rows / 2;
 

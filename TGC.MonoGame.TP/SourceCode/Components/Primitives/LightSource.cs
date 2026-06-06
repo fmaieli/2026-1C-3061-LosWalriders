@@ -8,7 +8,7 @@ namespace TGC.MonoGame.TP.SourceCode.Components
     {
         // Propiedades de la luz
         public float MaxDurability { get; protected set; }
-        public float Durability { get; protected set; }
+        public float Durability { get; set; }
         public float DecayRate { get; protected set; }      // Durabilidad que va perdiendo por segundo
         public float LightIntensity { get; protected set; } // Intensidad de la luz
 

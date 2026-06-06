@@ -2,15 +2,18 @@
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System.Collections.Generic;
 using System.Diagnostics;
 using TGC.MonoGame.TP.SourceCode.Components;
 
-namespace TGC.MonoGame.TP.SourceCode.Entities
+namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 {
     internal class Player
     {
         public Vector3 Position { get; private set; } = new Vector3(0, 50, 150);
         public float Rotation { get; private set; } = 0f;
+
+        public bool IsHidden { get; set; } = false; // Estado que valida si se encuentra escondido o no
 
         // Variables de camara Free y No Clip (para debuguear)
         private float _cameraPitch = 0f;
@@ -48,7 +51,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
 
         public void DrawArms(Matrix view, Matrix projection, GraphicsDevice graphicsDevice)
         {
-            if (_armsModel == null) return;
+            if (_armsModel == null || IsHidden) return;
 
             var bones = new Matrix[_armsModel.Bones.Count];
             _armsModel.CopyAbsoluteBoneTransformsTo(bones);
@@ -90,7 +93,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             matchLight?.Draw(view, projection, cameraWorld);
         }
 
-        public void Update(GameTime gameTime)
+        public void Update(GameTime gameTime, List<(Model Model, Matrix World, string Name)> models)
         {
             var keyboardState = Keyboard.GetState();
             var mouseState = Mouse.GetState();
@@ -98,6 +101,9 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
 
             // Manejo de Toggles
             HandleToggles(keyboardState);
+
+            // Manejo de interaccion con modelos
+            HandleInteraction(keyboardState, models);
 
             nokiaLight?.Update(elapsedTime);
             matchLight?.Update(elapsedTime);
@@ -146,17 +152,20 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             right.Normalize();
 
             Vector3 movement = Vector3.Zero;
-            if (keyboardState.IsKeyDown(Keys.W)) movement += forward * moveSpeed * elapsedTime;
-            if (keyboardState.IsKeyDown(Keys.S)) movement -= forward * moveSpeed * elapsedTime;
-            if (keyboardState.IsKeyDown(Keys.A)) movement -= right * moveSpeed * elapsedTime;
-            if (keyboardState.IsKeyDown(Keys.D)) movement += right * moveSpeed * elapsedTime;
+            if (!IsHidden)
+            {
+                if (keyboardState.IsKeyDown(Keys.W)) movement += forward * moveSpeed * elapsedTime;
+                if (keyboardState.IsKeyDown(Keys.S)) movement -= forward * moveSpeed * elapsedTime;
+                if (keyboardState.IsKeyDown(Keys.A)) movement -= right * moveSpeed * elapsedTime;
+                if (keyboardState.IsKeyDown(Keys.D)) movement += right * moveSpeed * elapsedTime;
+            }            
 
             // Separo los tipos de modo de movimiento del jugador
             if (_freeCameraMode || _noClipMode)
             {
                 ApplyDebugMovement(keyboardState, movement, moveSpeed, elapsedTime);
             }
-            else
+            else if (!IsHidden)
             {
                 ApplyNormalMovement(movement);
             }
@@ -191,18 +200,85 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
                 if (_noClipMode) _freeCameraMode = false;
             }
 
-            // Nokia (Tecla 1)
-            if (keyboardState.IsKeyDown(Keys.D1) && _previousKeyboardState.IsKeyUp(Keys.D1))
+            // El jugador no puede prender las luces cuando esta escondido
+            if (!IsHidden)
             {
-                nokiaLight?.Toggle();
-                if (nokiaLight.IsActive && matchLight != null) matchLight.IsActive = false;
-            }
+                // Nokia (Tecla 1)
+                if (keyboardState.IsKeyDown(Keys.D1) && _previousKeyboardState.IsKeyUp(Keys.D1))
+                {
+                    nokiaLight?.Toggle();
+                    if (nokiaLight.IsActive && matchLight != null) matchLight.IsActive = false;
+                }
 
-            // Fosforo (Tecla 2)
-            if (keyboardState.IsKeyDown(Keys.D2) && _previousKeyboardState.IsKeyUp(Keys.D2))
+                // Fosforo (Tecla 2)
+                if (keyboardState.IsKeyDown(Keys.D2) && _previousKeyboardState.IsKeyUp(Keys.D2))
+                {
+                    matchLight?.Toggle();
+                    if (matchLight.IsActive && nokiaLight != null) nokiaLight.IsActive = false;
+                }
+            }            
+        }
+
+        private void HandleInteraction(KeyboardState keyboardState, List<(Model Model, Matrix World, string Name)> models)
+        {
+            if (keyboardState.IsKeyDown(Keys.E) && _previousKeyboardState.IsKeyUp(Keys.E))
             {
-                matchLight?.Toggle();
-                if (matchLight.IsActive && nokiaLight != null) nokiaLight.IsActive = false;
+                if (IsHidden) // Si ya esta escondido, sale del armario
+                {
+                    IsHidden = false;
+                    Matrix cameraRotation = Matrix.CreateFromYawPitchRoll(Rotation, 0f, 0f);
+                    Position += Vector3.Transform(Vector3.Forward, cameraRotation) * 40f;
+                    Debug.WriteLine("Saliste del escondite");
+                    return;
+                }
+
+                int? modelIndexToRemove = null; // Se usa para borrar luego el modelo de match box con el que el jugador interactue
+
+                // Modelos con los que interactuar cercanos
+                for (int i = 0; i < models.Count; i++)
+                {
+                    var model = models[i];
+                    float distanceToModel = Vector3.Distance(Position, model.World.Translation);
+
+                    // Disntancia con respecto del closet
+                    if (distanceToModel < 80f)
+                    {
+                        if (model.Name.Contains("PSX_Wooden_Closet"))
+                        {
+                            IsHidden = true;
+                            // Teletransporto al jugador al centro del modelo
+                            Position = new Vector3(model.World.Translation.X, 50f, model.World.Translation.Z);
+
+                            // Apago las luces, por si ya las tenia prendidas el jugador en el momento de interactuar
+                            if (nokiaLight != null) nokiaLight.IsActive = false;
+                            if (matchLight != null) matchLight.IsActive = false;
+
+                            Debug.WriteLine("Te escondiste en el armario!");
+                            break; // Corto el for para que deje de buscar interactuar con otro modelos
+                        }
+                        else if (model.Name.Contains("PSX_Item_Match_Box"))
+                        {
+                            // Me fijo la carga actual de matchLight
+                            if (matchLight != null && matchLight.Durability <= 0f)
+                            {
+                                matchLight.Durability = matchLight.MaxDurability; // Recargo la durabilidad al maximo
+                                modelIndexToRemove = i; // Tomo el indice para borrar la caja
+                                Debug.WriteLine("Recogiste una caja de fosforos!");
+                                break;
+                            }
+                            else
+                            {
+                                Debug.WriteLine("Aun no se te acabaron los fosforos");
+                            }
+                        }
+                    }
+                }
+
+                // Elimino la caja de la lista
+                if (modelIndexToRemove.HasValue)
+                {
+                    models.RemoveAt(modelIndexToRemove.Value);
+                }
             }
         }
 
