@@ -69,7 +69,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             }
         }
 
-        public void Update(GameTime gameTime, Vector3 playerPosition)
+        public void Update(GameTime gameTime, Vector3 playerPosition, bool isPlayerHidden)
         {
             float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
@@ -87,7 +87,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
                 case EnemyState.Roaming:
                     Roam(elapsedTime);
-                    if (CanSeePlayer(playerPosition))
+                    if (CanSeePlayer(playerPosition, isPlayerHidden))
                     {
                         State = EnemyState.Chasing;
                     }
@@ -150,8 +150,10 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             return moved;   // En caso de haber colisionado entonces devuelve el valor por defecto que es false
         }        
 
-        private bool CanSeePlayer(Vector3 playerPos)
+        private bool CanSeePlayer(Vector3 playerPos, bool isPlayerHidden)
         {
+            if (isPlayerHidden) return false; // El enemigo no puede ver al jugador si esta escondido
+
             // Medir la distancia con el jugador
             Vector3 directionToPlayer = playerPos - Position;
             float distance = directionToPlayer.Length();        // Distancia hasta el jugador

@@ -138,7 +138,7 @@ public class TGCGame : Game
             Exit();
 
         _player.Update(gameTime, _models);
-        _enemy.Update(gameTime, _player.Position);
+        _enemy.Update(gameTime, _player.Position, _player.IsHidden);
         _view = _player.View;
 
         base.Update(gameTime);
