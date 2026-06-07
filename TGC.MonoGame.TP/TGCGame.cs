@@ -45,6 +45,9 @@ public class TGCGame : Game
 
     private readonly List<(Model Model, Matrix World, string Name)> _trees = new();
 
+    private float _gameTimer = 300f; // 5 Minutos (en segundos)
+    private bool _isGameOver = false;
+
     // Post-Processing
     private RenderTarget2D _sceneRenderTarget;
     private FullScreenQuad _fullScreenQuad;
@@ -53,6 +56,7 @@ public class TGCGame : Game
 
     // 2D
     private Texture2D _pixelTexture;
+    private SpriteFont _spriteFont;
 
     /// <summary>
     ///     Constructor del juego.
@@ -110,6 +114,9 @@ public class TGCGame : Game
         _pixelTexture = new Texture2D(GraphicsDevice, 1, 1);
         _pixelTexture.SetData(new[] { Color.White });
 
+        // SpriteFont
+        _spriteFont = Content.Load<SpriteFont>(ContentFolderSpriteFonts + "HUD_Timer");
+
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
@@ -163,6 +170,20 @@ public class TGCGame : Game
     {
         if (Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
+
+        // Logica de finalizacion de juego por falta de tiempo
+        if (!_isGameOver)
+        {
+            // Resto los segundos transcurridos
+            _gameTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            if (_gameTimer <= 0f)
+            {
+                _gameTimer = 0f;
+                _isGameOver = true;
+                System.Diagnostics.Debug.WriteLine("Game Over!");
+            }
+        }
 
         _player.Update(gameTime, _models);
         _enemy.Update(gameTime, _player.Position, _player.IsHidden);
@@ -291,10 +312,27 @@ public class TGCGame : Game
         #endregion
 
         #region HUD
+
+        _spriteBatch.Begin();
+
+        #region Timer
+        int minutes = (int)_gameTimer / 60;
+        int seconds = (int)_gameTimer % 60;
+        string timeText = $"{minutes:D2}:{seconds:D2}";
+
+        // Cuanto mide el texto para poder centrarlo en la pantalla
+        Vector2 textSize = _spriteFont.MeasureString(timeText);
+        Vector2 textPosition = new Vector2((GraphicsDevice.Viewport.Width - textSize.X) / 2f, 20f);
+
+        // Sombra en texto para que se note un poco mas
+        _spriteBatch.DrawString(_spriteFont, timeText, textPosition + new Vector2(2, 2), Color.Black);
+        // Dibujamos el texto blanco real, si queda 30 segundos o menos cambio el valor a rojo
+        _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White);
+        #endregion
+
+        #region Barra de durabilidad de luces
         if (_player.IsLightActive)
         {
-            _spriteBatch.Begin();
-
             float percentage = _player.CurrentLightDurabilityPercentage;
 
             int barWidth = 400;
@@ -310,12 +348,15 @@ public class TGCGame : Game
             // Con el valor del porcentajo voy actualizando el valor lleno de la barra
             int fillWidth = (int)(barWidth * percentage);
             // Blanco para el valor del porcentaje restante
-            _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
-            _spriteBatch.End();
+            _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);          
 
             // Restauro DepthStencilState tras usar SpriteBatch
             GraphicsDevice.DepthStencilState = DepthStencilState.Default;
         }
+        #endregion
+
+        _spriteBatch.End();
+
         #endregion
 
         base.Draw(gameTime);

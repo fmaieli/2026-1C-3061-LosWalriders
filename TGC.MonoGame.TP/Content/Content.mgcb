@@ -1226,6 +1226,13 @@
 /processorParam:TextureFormat=Compressed
 /build:Models/World/PSX_Low_Poly_Tree.fbx;Models/World/PSX_Low_Poly_Tree
 
+#begin SpriteFonts/HUD_Timer.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/processorParam:PremultiplyAlpha=True
+/processorParam:TextureFormat=Compressed
+/build:SpriteFonts/HUD_Timer.spritefont
+
 #begin Textures/blood_splash.png
 /importer:TextureImporter
 /processor:TextureProcessor
