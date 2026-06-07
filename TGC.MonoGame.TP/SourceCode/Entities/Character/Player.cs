@@ -15,6 +15,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
         public bool IsHidden { get; set; } = false; // Estado que valida si se encuentra escondido o no
 
+        public int? InteractableModelIndex { get; private set; } = null; // Indice para saber cual es el modelo con el cual el jugadr interactua
+
         // Variables de camara Free y No Clip (para debuguear)
         private float _cameraPitch = 0f;
         private bool _freeCameraMode = false;
@@ -101,6 +103,27 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
             // Manejo de Toggles
             HandleToggles(keyboardState);
+
+            // Modelos con los que interactuar cercanos
+            // Reviso antes de interactuar si el modelo es interactuable
+            float closestDistance = 120f;
+
+            if (!IsHidden) // Solo se puede interactuar con los objetos si no estamos escondidos
+            {
+                for (int i = 0; i < models.Count; i++)
+                {
+                    var model = models[i];
+                    if (model.Name.Contains("PSX_Wooden_Closet") || model.Name.Contains("PSX_Item_Match_Box"))
+                    {
+                        float distanceToModel = Vector3.Distance(Position, model.World.Translation);
+                        if (distanceToModel < closestDistance)
+                        {
+                            closestDistance = distanceToModel;
+                            InteractableModelIndex = i; // Guardo el indice del modelo mas cercano
+                        }
+                    }
+                }
+            }
 
             // Manejo de interaccion con modelos
             HandleInteraction(keyboardState, models);
@@ -234,42 +257,38 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
                 int? modelIndexToRemove = null; // Se usa para borrar luego el modelo de match box con el que el jugador interactue
 
-                // Modelos con los que interactuar cercanos
-                for (int i = 0; i < models.Count; i++)
+                // En vez de buscar por todos los modelos nuevamente,
+                // Solo utilizo el valor que ya averigue anteriormente
+                if (InteractableModelIndex.HasValue)
                 {
-                    var model = models[i];
-                    float distanceToModel = Vector3.Distance(Position, model.World.Translation);
+                    var model = models[InteractableModelIndex.Value];
 
-                    // Disntancia con respecto del closet
-                    if (distanceToModel < 80f)
+                    if (model.Name.Contains("PSX_Wooden_Closet"))
                     {
-                        if (model.Name.Contains("PSX_Wooden_Closet"))
+                        IsHidden = true;
+                        // Teletransporto al jugador al centro del modelo
+                        Position = new Vector3(model.World.Translation.X, 50f, model.World.Translation.Z);
+
+                        // Apago las luces, por si ya las tenia prendidas el jugador en el momento de interactuar
+                        if (nokiaLight != null) nokiaLight.IsActive = false;
+                        if (matchLight != null) matchLight.IsActive = false;
+
+                        Debug.WriteLine("Te escondiste en el armario!");
+                    }
+                    else if (model.Name.Contains("PSX_Item_Match_Box"))
+                    {
+                        // Me fijo la carga actual de matchLight
+                        if (matchLight != null && matchLight.Durability <= 0f)
                         {
-                            IsHidden = true;
-                            // Teletransporto al jugador al centro del modelo
-                            Position = new Vector3(model.World.Translation.X, 50f, model.World.Translation.Z);
+                            matchLight.Durability = matchLight.MaxDurability; // Recargo la durabilidad al maximo
+                            models.RemoveAt(InteractableModelIndex.Value); // Borro el item directamente de la lista con el indice ya conocido
 
-                            // Apago las luces, por si ya las tenia prendidas el jugador en el momento de interactuar
-                            if (nokiaLight != null) nokiaLight.IsActive = false;
-                            if (matchLight != null) matchLight.IsActive = false;
-
-                            Debug.WriteLine("Te escondiste en el armario!");
-                            break; // Corto el for para que deje de buscar interactuar con otro modelos
+                            InteractableModelIndex = null;
+                            Debug.WriteLine("Recogiste una caja de fosforos!");
                         }
-                        else if (model.Name.Contains("PSX_Item_Match_Box"))
+                        else
                         {
-                            // Me fijo la carga actual de matchLight
-                            if (matchLight != null && matchLight.Durability <= 0f)
-                            {
-                                matchLight.Durability = matchLight.MaxDurability; // Recargo la durabilidad al maximo
-                                modelIndexToRemove = i; // Tomo el indice para borrar la caja
-                                Debug.WriteLine("Recogiste una caja de fosforos!");
-                                break;
-                            }
-                            else
-                            {
-                                Debug.WriteLine("Aun no se te acabaron los fosforos");
-                            }
+                            Debug.WriteLine("Aun no se te acabaron los fosforos");
                         }
                     }
                 }

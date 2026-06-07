@@ -244,8 +244,17 @@ public class TGCGame : Game
         }
 
         // Dibujado de modelos en habitaciones
-        foreach (var (model, world, name) in _models)
+        for (int i = 0; i < _models.Count; i++)
         {
+            var (model, world, name) = _models[i];
+
+            // Si este es el objeto que el jugador esta mirando de cerca, se le dibuja el borde
+            if (_player.InteractableModelIndex == i)
+            {
+                DrawModelOutline(model, world, name);
+            }
+
+            // Dibujo normal
             DrawModelWithCustomEffect(model, world, name);
         }
 
@@ -297,6 +306,36 @@ public class TGCGame : Game
 
             mesh.Draw();
         }
+    }
+
+    private void DrawModelOutline(Model model, Matrix world, string name)
+    {
+        // Modifico Rasterizer para que solo dibuje las caras internas del modelo
+        GraphicsDevice.RasterizerState = new RasterizerState { CullMode = CullMode.CullClockwiseFace };
+        // Diferencio el escalado del modelo para que se note mas el borde para match box
+        float outlineScale = name.Contains("Match_Box") ? 1.20f : 1.03f;
+
+        Matrix outlineWorld = Matrix.CreateScale(outlineScale) * world;
+
+        foreach (var mesh in model.Meshes)
+        {
+            foreach (var part in mesh.MeshParts)
+            {
+                var effect = (Effect)part.Effect;
+
+                effect.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * outlineWorld);
+                effect.Parameters["View"]?.SetValue(_view);
+                effect.Parameters["Projection"]?.SetValue(_projection);
+                effect.Parameters["UseVertexColor"]?.SetValue(false);
+                // Yellow cuando tenga los shaders
+                effect.Parameters["DiffuseColor"]?.SetValue(Color.Azure.ToVector3());
+            }
+
+            mesh.Draw();
+        }
+
+        // Restauro el estado de Rasterizer para dibujar correctamente todo el resto
+        GraphicsDevice.RasterizerState = new RasterizerState { CullMode = CullMode.None };
     }
 
     /// <summary>
