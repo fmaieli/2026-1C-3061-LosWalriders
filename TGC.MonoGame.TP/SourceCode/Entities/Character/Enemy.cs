@@ -12,7 +12,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
     internal class Enemy
     {
         public Vector3 Position { get; set; }
-        public Vector3 Forward { get; private set; } = Vector3.Forward;
+        public Vector3 Forward { get; set; } = Vector3.Forward;
         public EnemyState State { get; private set; } = EnemyState.Roaming;
         public float CooldownIntensity => State == EnemyState.Cooldown ? _cooldownTimer / _cooldownDuration : 0f;
 

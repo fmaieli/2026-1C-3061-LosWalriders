@@ -6,6 +6,7 @@ using TGC.MonoGame.TP.SourceCode.Entities.Character;
 using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Geometries;
 using TGC.MonoGame.TP.SourceCode.Helpers;
+using TGC.MonoGame.TP.SourceCode.Screens;
 
 namespace TGC.MonoGame.TP;
 
@@ -47,6 +48,16 @@ public class TGCGame : Game
 
     private float _gameTimer = 300f; // 5 Minutos (en segundos)
     private bool _isGameOver = false;
+
+    // Menu
+    private GameState _gameState = GameState.Menu;
+
+    private MenuScreen _menuScreen = new MenuScreen();
+
+    // Animacion de camera
+    private Vector3 _menuCameraPosition;
+    private Vector3 _menuCameraTarget;
+    private float _transitionProgress = 0f;
 
     // Post-Processing
     private RenderTarget2D _sceneRenderTarget;
@@ -126,7 +137,12 @@ public class TGCGame : Game
         _enemy.LoadContent(Content, _effect);
         // En un principio dibujo el enemigo cerca para comprobar que este funcionando correctamente
         // Revisar donde deberia de spawnear dentro del mapa
-        _enemy.Position = _player.Position + new Vector3(0, 0, -250f);
+        _enemy.Position = _player.Position + new Vector3(0, 0, -500f);
+
+        // Busco donde esta el jugador y lo apunto al enemigo hacia él
+        Vector3 directionToPlayer = _player.Position - _enemy.Position;
+        directionToPlayer.Normalize();
+        _enemy.Forward = directionToPlayer;
 
         // Delegamos TODA la generacion del nivel al Helper
         LevelGeneratorHelper.GenerateLevel(
@@ -158,6 +174,10 @@ public class TGCGame : Game
         _postProcessEffect.Parameters["overlayTexture"]?.SetValue(_overlayTexture);
         #endregion
 
+        // Vista inicial del menu
+        _menuCameraPosition = _player.Position + new Vector3(0, 15f, 250f);
+        _menuCameraTarget = _player.Position + new Vector3(0, 20f, 0f);
+
         base.LoadContent();   
     }
 
@@ -171,23 +191,71 @@ public class TGCGame : Game
         if (Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
-        // Logica de finalizacion de juego por falta de tiempo
-        if (!_isGameOver)
+        switch (_gameState)
         {
-            // Resto los segundos transcurridos
-            _gameTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+            case GameState.Menu:
+                // Habilito el mouse para el menu
+                IsMouseVisible = true;
 
-            if (_gameTimer <= 0f)
-            {
-                _gameTimer = 0f;
-                _isGameOver = true;
-                System.Diagnostics.Debug.WriteLine("Game Over!");
-            }
+                var action = _menuScreen.Update();
+                if (action == MenuAction.Play)
+                {
+                    _gameState = GameState.Transitioning;
+                }
+                else if (action == MenuAction.Exit)
+                {
+                    Exit();
+                }
+
+                // Camara estatica mirando a la puerta de entrada
+                _view = Matrix.CreateLookAt(_menuCameraPosition, _menuCameraTarget, Vector3.Up);
+                break;
+
+            case GameState.Transitioning:
+                // Deshabilito el mouse nuevamente
+                IsMouseVisible = false;
+                // Dura 2 segundos la transicion
+                _transitionProgress += (float)gameTime.ElapsedGameTime.TotalSeconds / 2.0f;
+
+                if (_transitionProgress >= 1f)
+                {
+                    _transitionProgress = 1f;
+                    _gameState = GameState.Playing;
+                }
+
+                // Posicion de la camara del jugador y hacia donde esta mirando
+                Matrix playerRotation = Matrix.CreateFromYawPitchRoll(_player.Rotation, 0f, 0f);
+                Vector3 playerTarget = _player.Position + Vector3.Transform(Vector3.Forward, playerRotation);
+
+                // MathHelper.SmoothStep hace que el vuelo arranque suave, acelere y frene suavemente al llegar
+                Vector3 currentPos = Vector3.Lerp(_menuCameraPosition, _player.Position, MathHelper.SmoothStep(0, 1, _transitionProgress));
+                Vector3 currentTarget = Vector3.Lerp(_menuCameraTarget, playerTarget, MathHelper.SmoothStep(0, 1, _transitionProgress));
+
+                _view = Matrix.CreateLookAt(currentPos, currentTarget, Vector3.Up);
+                break;
+
+            case GameState.Playing:                
+                if (!_isGameOver)
+                {
+                    _gameTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+                    if (_gameTimer <= 0f)
+                    {
+                        _gameTimer = 0f;
+                        _isGameOver = true;
+                        System.Diagnostics.Debug.WriteLine("Game Over!");
+                        _gameState = GameState.GameOver; // Cambio estado para futura pantalla de Game Over
+                    }
+                }
+
+                _player.Update(gameTime, _models);
+                _enemy.Update(gameTime, _player.Position, _player.IsHidden);
+                _view = _player.View;
+                break;
+
+            case GameState.GameOver:
+                // Logica de pantalla de Game Over
+                break;
         }
-
-        _player.Update(gameTime, _models);
-        _enemy.Update(gameTime, _player.Position, _player.IsHidden);
-        _view = _player.View;
 
         base.Update(gameTime);
     }
@@ -315,47 +383,56 @@ public class TGCGame : Game
 
         _spriteBatch.Begin();
 
-        #region Timer
-        int minutes = (int)_gameTimer / 60;
-        int seconds = (int)_gameTimer % 60;
-        string timeText = $"{minutes:D2}:{seconds:D2}";
-
-        // Cuanto mide el texto para poder centrarlo en la pantalla
-        Vector2 textSize = _spriteFont.MeasureString(timeText);
-        Vector2 textPosition = new Vector2((GraphicsDevice.Viewport.Width - textSize.X) / 2f, 20f);
-
-        // Sombra en texto para que se note un poco mas
-        _spriteBatch.DrawString(_spriteFont, timeText, textPosition + new Vector2(2, 2), Color.Black);
-        // Dibujamos el texto blanco real, si queda 30 segundos o menos cambio el valor a rojo
-        _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White);
-        #endregion
-
-        #region Barra de durabilidad de luces
-        if (_player.IsLightActive)
+        // Valido que este jugando antes de dibujar el HUD
+        if (_gameState == GameState.Menu)
         {
-            float percentage = _player.CurrentLightDurabilityPercentage;
-
-            int barWidth = 400;
-            int barHeight = 20;
-
-            // Centrado horizontalmente y en la parte inferior de la pantalla
-            int xPos = (GraphicsDevice.Viewport.Width - barWidth) / 2;
-            int yPos = GraphicsDevice.Viewport.Height - 60;
-
-            // Fondo gris oscuro para la barra
-            _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, barWidth, barHeight), Color.DarkGray);
-
-            // Con el valor del porcentajo voy actualizando el valor lleno de la barra
-            int fillWidth = (int)(barWidth * percentage);
-            // Blanco para el valor del porcentaje restante
-            _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);          
-
-            // Restauro DepthStencilState tras usar SpriteBatch
-            GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+            // Dibujado de botones del menu
+            _menuScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture);
         }
-        #endregion
+        else if (_gameState == GameState.Playing)
+        {
+            #region Timer
+            int minutes = (int)_gameTimer / 60;
+            int seconds = (int)_gameTimer % 60;
+            string timeText = $"{minutes:D2}:{seconds:D2}";
+
+            // Cuanto mide el texto para poder centrarlo en la pantalla
+            Vector2 textSize = _spriteFont.MeasureString(timeText);
+            Vector2 textPosition = new Vector2((GraphicsDevice.Viewport.Width - textSize.X) / 2f, 20f);
+
+            // Sombra en texto para que se note un poco mas
+            _spriteBatch.DrawString(_spriteFont, timeText, textPosition + new Vector2(2, 2), Color.Black);
+            // Dibujamos el texto blanco real, si queda 30 segundos o menos cambio el valor a rojo
+            _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White);
+            #endregion
+
+            #region Barra de durabilidad de luces
+            if (_player.IsLightActive)
+            {
+                float percentage = _player.CurrentLightDurabilityPercentage;
+
+                int barWidth = 400;
+                int barHeight = 20;
+
+                // Centrado horizontalmente y en la parte inferior de la pantalla
+                int xPos = (GraphicsDevice.Viewport.Width - barWidth) / 2;
+                int yPos = GraphicsDevice.Viewport.Height - 60;
+
+                // Fondo gris oscuro para la barra
+                _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, barWidth, barHeight), Color.DarkGray);
+
+                // Con el valor del porcentajo voy actualizando el valor lleno de la barra
+                int fillWidth = (int)(barWidth * percentage);
+                // Blanco para el valor del porcentaje restante
+                _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
+            }
+            #endregion
+        }
 
         _spriteBatch.End();
+
+        // Restauro DepthStencilState tras usar SpriteBatch
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
 
         #endregion
 
