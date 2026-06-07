@@ -12,10 +12,22 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
     {
         public Vector3 Position { get; private set; } = new Vector3(0, 50, 150);
         public float Rotation { get; private set; } = 0f;
-
         public bool IsHidden { get; set; } = false; // Estado que valida si se encuentra escondido o no
-
         public int? InteractableModelIndex { get; private set; } = null; // Indice para saber cual es el modelo con el cual el jugadr interactua
+        public bool IsLightActive => (nokiaLight != null && nokiaLight.IsActive) || (matchLight != null && matchLight.IsActive);
+        public float CurrentLightDurabilityPercentage // Porcentaje de durabilidad
+        {
+            get
+            {
+                if (nokiaLight != null && nokiaLight.IsActive)
+                    return nokiaLight.Durability / nokiaLight.MaxDurability;
+
+                if (matchLight != null && matchLight.IsActive)
+                    return matchLight.Durability / matchLight.MaxDurability;
+
+                return 0f;
+            }
+        }
 
         // Variables de camara Free y No Clip (para debuguear)
         private float _cameraPitch = 0f;

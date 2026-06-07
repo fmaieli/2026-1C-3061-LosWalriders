@@ -51,6 +51,9 @@ public class TGCGame : Game
     private Effect _postProcessEffect;
     private Texture2D _overlayTexture;
 
+    // 2D
+    private Texture2D _pixelTexture;
+
     /// <summary>
     ///     Constructor del juego.
     /// </summary>
@@ -103,6 +106,9 @@ public class TGCGame : Game
     {
         // Aca es donde deberiamos cargar todos los contenido necesarios antes de iniciar el juego.
         _spriteBatch = new SpriteBatch(GraphicsDevice);
+
+        _pixelTexture = new Texture2D(GraphicsDevice, 1, 1);
+        _pixelTexture.SetData(new[] { Color.White });
 
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
@@ -281,6 +287,34 @@ public class TGCGame : Game
             _postProcessEffect.Parameters["intensity"]?.SetValue(_enemy.CooldownIntensity);
 
             _fullScreenQuad.Draw(_postProcessEffect);
+        }
+        #endregion
+
+        #region HUD
+        if (_player.IsLightActive)
+        {
+            _spriteBatch.Begin();
+
+            float percentage = _player.CurrentLightDurabilityPercentage;
+
+            int barWidth = 400;
+            int barHeight = 20;
+
+            // Centrado horizontalmente y en la parte inferior de la pantalla
+            int xPos = (GraphicsDevice.Viewport.Width - barWidth) / 2;
+            int yPos = GraphicsDevice.Viewport.Height - 60;
+
+            // Fondo gris oscuro para la barra
+            _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, barWidth, barHeight), Color.DarkGray);
+
+            // Con el valor del porcentajo voy actualizando el valor lleno de la barra
+            int fillWidth = (int)(barWidth * percentage);
+            // Blanco para el valor del porcentaje restante
+            _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
+            _spriteBatch.End();
+
+            // Restauro DepthStencilState tras usar SpriteBatch
+            GraphicsDevice.DepthStencilState = DepthStencilState.Default;
         }
         #endregion
 
