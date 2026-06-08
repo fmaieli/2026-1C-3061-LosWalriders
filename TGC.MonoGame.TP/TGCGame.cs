@@ -1,6 +1,8 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Media;
 using System.Collections.Generic;
 using TGC.MonoGame.TP.SourceCode.Entities.Character;
 using TGC.MonoGame.TP.SourceCode.Enums;
@@ -68,6 +70,15 @@ public class TGCGame : Game
     // 2D
     private Texture2D _pixelTexture;
     private SpriteFont _spriteFont;
+
+    // Musica
+    private Song _menuMusic;
+    private Song _gameMusic;
+
+    // Efectos de sonido
+    private SoundEffect _carDoorOpen;
+    private SoundEffect _carDoorClose;
+    private bool _hasPlayedDoorClose = false;
 
     /// <summary>
     ///     Constructor del juego.
@@ -178,6 +189,18 @@ public class TGCGame : Game
         _menuCameraPosition = _player.Position + new Vector3(0, 15f, 250f);
         _menuCameraTarget = _player.Position + new Vector3(0, 20f, 0f);
 
+        // Musica del juego
+        _menuMusic = Content.Load<Song>(ContentFolderMusic + "menu_terror_music");
+        _gameMusic = Content.Load<Song>(ContentFolderMusic + "ambience");
+        // Efectos de sonido
+        _carDoorOpen = Content.Load<SoundEffect>(ContentFolderSounds + "car_door_open");
+        _carDoorClose = Content.Load<SoundEffect>(ContentFolderSounds + "car_door_close");
+
+        // Se configura para que este en loop constante
+        MediaPlayer.IsRepeating = true;
+        // Arranca con la musica del menu apenas se ejecuta
+        MediaPlayer.Play(_menuMusic);
+
         base.LoadContent();   
     }
 
@@ -201,6 +224,11 @@ public class TGCGame : Game
                 if (action == MenuAction.Play)
                 {
                     _gameState = GameState.Transitioning;
+                    MediaPlayer.Stop();
+
+                    // Sonido de puerta de auto abriendose
+                    _carDoorOpen.Play();
+                    _hasPlayedDoorClose = false;
                 }
                 else if (action == MenuAction.Exit)
                 {
@@ -217,10 +245,19 @@ public class TGCGame : Game
                 // Dura 2 segundos la transicion
                 _transitionProgress += (float)gameTime.ElapsedGameTime.TotalSeconds / 2.0f;
 
+                // 70% de la transicion
+                if (_transitionProgress >= 0.7f && !_hasPlayedDoorClose)
+                {
+                    _carDoorClose.Play();
+                    _hasPlayedDoorClose = true; // Para que no vuelva a sonar nuevamente
+                }
+
+                // 100% de la transicion
                 if (_transitionProgress >= 1f)
                 {
                     _transitionProgress = 1f;
                     _gameState = GameState.Playing;
+                    MediaPlayer.Play(_gameMusic);
                 }
 
                 // Posicion de la camara del jugador y hacia donde esta mirando
@@ -244,6 +281,7 @@ public class TGCGame : Game
                         _isGameOver = true;
                         System.Diagnostics.Debug.WriteLine("Game Over!");
                         _gameState = GameState.GameOver; // Cambio estado para futura pantalla de Game Over
+                        MediaPlayer.Stop();
                     }
                 }
 
