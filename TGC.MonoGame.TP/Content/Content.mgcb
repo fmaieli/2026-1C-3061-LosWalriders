@@ -1226,6 +1226,42 @@
 /processorParam:TextureFormat=Compressed
 /build:Models/World/PSX_Low_Poly_Tree.fbx;Models/World/PSX_Low_Poly_Tree
 
+#begin Music/ambience.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Music/ambience.mp3
+
+#begin Music/menu_terror_music.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Music/menu_terror_music.mp3
+
+#begin Sounds/car_door_close.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Sounds/car_door_close.mp3
+
+#begin Sounds/car_door_open.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Sounds/car_door_open.mp3
+
+#begin Sounds/open_door.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Sounds/open_door.mp3
+
+#begin Sounds/terror_scream.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Sounds/terror_scream.mp3
+
 #begin SpriteFonts/HUD_Timer.spritefont
 /importer:FontDescriptionImporter
 /processor:FontDescriptionProcessor
