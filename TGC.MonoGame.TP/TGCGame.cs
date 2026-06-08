@@ -79,6 +79,8 @@ public class TGCGame : Game
     private SoundEffect _carDoorOpen;
     private SoundEffect _carDoorClose;
     private bool _hasPlayedDoorClose = false;
+    private SoundEffect _terrorScream;
+    private float _screamTimer = 60f;
 
     /// <summary>
     ///     Constructor del juego.
@@ -195,6 +197,7 @@ public class TGCGame : Game
         // Efectos de sonido
         _carDoorOpen = Content.Load<SoundEffect>(ContentFolderSounds + "car_door_open");
         _carDoorClose = Content.Load<SoundEffect>(ContentFolderSounds + "car_door_close");
+        _terrorScream = Content.Load<SoundEffect>(ContentFolderSounds + "terror_scream");
 
         // Se configura para que este en loop constante
         MediaPlayer.IsRepeating = true;
@@ -283,6 +286,24 @@ public class TGCGame : Game
                         _gameState = GameState.GameOver; // Cambio estado para futura pantalla de Game Over
                         MediaPlayer.Stop();
                     }
+                }
+
+                // Calculo que cad un minuto se escuche un grito
+                _screamTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+                if (_screamTimer <= 0f)
+                {
+                    // Reinicio el temporizador de grito
+                    _screamTimer = 60f;
+                    
+                    SoundEffectInstance screamInstance = _terrorScream.CreateInstance();
+                    // Disminuyo el volumen para que parezca mas lejano
+                    screamInstance.Volume = 0.2f;
+                    // Paneo del sonido de forma aleatoria para que parezca que viene de algun lugar del nivel
+                    // -1.0f (totalmente a la Izquierda) a 1.0f (totalmente a la Derecha)
+                    System.Random rnd = new System.Random();
+                    screamInstance.Pan = (float)(rnd.NextDouble() * 2.0 - 1.0);
+                    screamInstance.Play();
                 }
 
                 _player.Update(gameTime, _models);
