@@ -354,24 +354,25 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     }
 
                     // Pared Frontal
+                    // Pared Frontal
                     PlaceDoorModel(frontOpening, new Vector3(doorOffsetX, 0, mergedDepthHalf), 0f,
                         z + heightCells - 1, x + widthCells / 2, z + heightCells, x + widthCells / 2,
-                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, normalDoorPath, models, currentLockModel, currentLockPath);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath);
 
                     // Pared Trasera
                     PlaceDoorModel(backOpening, new Vector3(doorOffsetX, 0, -mergedDepthHalf), MathHelper.Pi,
                         z, x + widthCells / 2, z - 1, x + widthCells / 2,
-                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, normalDoorPath, models, currentLockModel, currentLockPath);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath);
 
                     // Pared Izquierda
                     PlaceDoorModel(leftOpening, new Vector3(-mergedWidthHalf, 0, doorOffsetZ), -MathHelper.PiOver2,
                         z + heightCells / 2, x, z + heightCells / 2, x - 1,
-                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, normalDoorPath, models, currentLockModel, currentLockPath);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath);
 
                     // Pared Derecha
                     PlaceDoorModel(rightOpening, new Vector3(mergedWidthHalf, 0, doorOffsetZ), MathHelper.PiOver2,
                         z + heightCells / 2, x + widthCells - 1, z + heightCells / 2, x + widthCells,
-                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, normalDoorPath, models, currentLockModel, currentLockPath );
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath);
 
                     // Renderizado de modelos por habitacion
                     IRoomAssets roomTypeInstance = RoomFactory.Create(roomData.Value.Type);

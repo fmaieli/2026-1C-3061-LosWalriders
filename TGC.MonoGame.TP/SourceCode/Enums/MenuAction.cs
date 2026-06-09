@@ -12,6 +12,7 @@ namespace TGC.MonoGame.TP.SourceCode.Enums
         None,
         Play,
         Tutorial,
-        Exit
+        Exit,
+        MainMenu
     }
 }

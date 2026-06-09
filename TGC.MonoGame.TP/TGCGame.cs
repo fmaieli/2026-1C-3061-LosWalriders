@@ -50,10 +50,13 @@ public class TGCGame : Game
 
     private float _gameTimer = 300f; // 5 Minutos (en segundos)
     private bool _isGameOver = false;
+    private float _timeTaken = 0f;
 
-    // Menu
+    // Menu - Victory - GameOver
     private GameState _gameState = GameState.Menu;
     private MenuScreen _menuScreen = new MenuScreen();
+    private VictoryScreen _victoryScreen = new VictoryScreen();
+    private GameOverScreen _gameOverScreen = new GameOverScreen();
 
     // Animacion de camera
     private Vector3 _menuCameraPosition;
@@ -155,21 +158,8 @@ public class TGCGame : Game
         Vector3 directionToPlayer = _player.Position - _enemy.Position;
         directionToPlayer.Normalize();
         _enemy.Forward = directionToPlayer;
-
-        // Delegamos TODA la generacion del nivel al Helper
-        LevelGeneratorHelper.GenerateLevel(
-            GraphicsDevice,
-            Content,
-            _effect,
-            _player.Position,
-            _modelCache,
-            _rooms,
-            _models,
-            _trees,
-            out _groundVertexBuffer,
-            out _groundIndexBuffer,
-            out _groundPrimitiveCount
-        );
+        
+        LoadLevel();
 
         Window.Title = $"TGC.MonoGame.TP - Models: {_models.Count + _trees.Count}";
 
@@ -202,6 +192,10 @@ public class TGCGame : Game
         MediaPlayer.IsRepeating = true;
         // Arranca con la musica del menu apenas se ejecuta
         MediaPlayer.Play(_menuMusic);
+
+        // Pantallas Victory - GameOver
+        _victoryScreen.Initialize(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+        _gameOverScreen.Initialize(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
 
         base.LoadContent();   
     }
@@ -273,18 +267,19 @@ public class TGCGame : Game
                 _view = Matrix.CreateLookAt(currentPos, currentTarget, Vector3.Up);
                 break;
 
-            case GameState.Playing:                
+            case GameState.Playing:
                 if (!_isGameOver)
                 {
                     _gameTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
-                    if (_gameTimer <= 0f)
-                    {
-                        _gameTimer = 0f;
-                        _isGameOver = true;
-                        System.Diagnostics.Debug.WriteLine("Game Over!");
-                        _gameState = GameState.GameOver; // Cambio estado para futura pantalla de Game Over
-                        MediaPlayer.Stop();
-                    }
+                }
+
+                if (_player.HasWon)
+                {
+                    // Restamos los 5 minutos (300) menos el tiempo sobrante para saber cuánto tardó
+                    _timeTaken = 300f - _gameTimer;
+                    _gameState = GameState.Victory;
+                    MediaPlayer.Stop(); // Paramos la música de tensión
+                    // Opcional: _victorySound.Play(); si tuvieras un sonido
                 }
 
                 // Calculo que cad un minuto se escuche un grito
@@ -327,7 +322,19 @@ public class TGCGame : Game
                 break;
 
             case GameState.GameOver:
-                // Logica de pantalla de Game Over
+                IsMouseVisible = true;
+                if (_gameOverScreen.Update() == MenuAction.MainMenu)
+                {
+                    ResetGame();
+                }
+                break;
+
+            case GameState.Victory:
+                IsMouseVisible = true;
+                if (_victoryScreen.Update() == MenuAction.MainMenu)
+                {
+                    ResetGame();
+                }
                 break;
         }
 
@@ -462,6 +469,14 @@ public class TGCGame : Game
         {
             // Dibujado de botones del menu
             _menuScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture);
+        }
+        else if (_gameState == GameState.GameOver)
+        {
+            _gameOverScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice);
+        }
+        else if (_gameState == GameState.Victory)
+        {
+            _victoryScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice, _timeTaken);
         }
         else if (_gameState == GameState.Playing)
         {
@@ -647,6 +662,45 @@ public class TGCGame : Game
 
         // Restauro el estado de Rasterizer para dibujar correctamente todo el resto
         GraphicsDevice.RasterizerState = new RasterizerState { CullMode = CullMode.None };
+    }
+
+    private void LoadLevel()
+    {
+        // Limpiamos todo antes de volver a llenar
+        _models.Clear();
+        _rooms.Clear();
+        _trees.Clear();
+        _modelCache.Clear(); // Es importante limpiar el cache para forzar la recarga
+
+        // Delegamos TODA la generacion del nivel al Helper
+        LevelGeneratorHelper.GenerateLevel(
+            GraphicsDevice,
+            Content,
+            _effect,
+            _player.Position,
+            _modelCache,
+            _rooms,
+            _models,
+            _trees,
+            out _groundVertexBuffer,
+            out _groundIndexBuffer,
+            out _groundPrimitiveCount
+        );
+    }
+
+    private void ResetGame()
+    {
+        // Reiniciamos variables de juego
+        _gameTimer = 300f;
+        _isGameOver = false;
+        _transitionProgress = 0f;
+        _player.ResetStats();
+
+        // Llamamos a la carga del nivel
+        LoadLevel();
+
+        _gameState = GameState.Menu;
+        MediaPlayer.Play(_menuMusic);
     }
 
     /// <summary>

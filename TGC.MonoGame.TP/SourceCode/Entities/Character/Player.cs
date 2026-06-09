@@ -16,6 +16,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
         public bool IsHidden { get; set; } = false; // Estado que valida si se encuentra escondido o no
         public int? InteractableModelIndex { get; private set; } = null; // Indice para saber cual es el modelo con el cual el jugadr interactua
         public int CollectedKeys { get; private set; } = 0;
+        public bool HasWon { get; private set; } = false;
         public bool IsLightActive => (nokiaLight != null && nokiaLight.IsActive) || (matchLight != null && matchLight.IsActive);
         public float CurrentLightDurabilityPercentage // Porcentaje de durabilidad
         {
@@ -247,6 +248,14 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             _previousKeyboardState = keyboardState;
         }
 
+        public void ResetStats()
+        {
+            Position = new Vector3(0, 50, 150); // Posicion inicial
+            CollectedKeys = 0;
+            HasWon = false;
+            IsHidden = false;
+        }
+
         private void HandleToggles(KeyboardState keyboardState)
         {
             // Free Camera (Ctrl + Shift + F)
@@ -391,6 +400,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                             if (allLocksOpen)
                             {
                                 Debug.WriteLine("¡Ganaste, conseguiste el premio!");
+                                HasWon = true;
 
                                 // Tomamos el modelo de la puerta actual
                                 var door = models[InteractableModelIndex.Value];
