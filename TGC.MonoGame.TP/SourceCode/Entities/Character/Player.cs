@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -31,6 +32,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                 return 0f;
             }
         }
+        public Matrix View { get; private set; }
 
         // Variables de camara Free y No Clip (para debuguear)
         private float _cameraPitch = 0f;
@@ -38,9 +40,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
         private bool _noClipMode = false;
 
         private KeyboardState _previousKeyboardState;
-        private MouseState _previousMouseState;
-
-        public Matrix View { get; private set; }
+        private MouseState _previousMouseState;        
 
         private Model _armsModel;
         private Effect _armsEffect;
@@ -49,10 +49,13 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
         private LightSource nokiaLight;
         private LightSource matchLight;
 
+        private SoundEffect _keyPickupSound;
+
         public void LoadContent(ContentManager content, Effect effect)
         {
             _armsEffect = content.Load<Effect>("Effects/ArmsShader");
             _armsModel = content.Load<Model>("Models/Player/PSX_Player_Arms");
+            _keyPickupSound = content.Load<SoundEffect>("Sounds/keys");
 
             foreach (var mesh in _armsModel.Meshes)
             {
@@ -238,6 +241,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                     {
                         CollectedKeys++;
                         models.RemoveAt(i); // Elimino la llave del mundo
+                        _keyPickupSound?.Play();
                         Debug.WriteLine($"¡Llave recolectada! ({CollectedKeys}/3)");
                     }
                 }
