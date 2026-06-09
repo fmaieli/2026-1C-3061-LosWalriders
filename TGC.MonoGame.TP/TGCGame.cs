@@ -306,6 +306,22 @@ public class TGCGame : Game
                     screamInstance.Play();
                 }
 
+                #region Girar modelos flotando en el aire
+                for (int i = 0; i < _models.Count; i++)
+                {
+                    if (_models[i].Name.Contains("PSX_Item_Shotgun") || _models[i].Name.Contains("PSX_Item_Key"))
+                    {
+                        var modelTuple = _models[i];
+
+                        Vector3 position = modelTuple.World.Translation;
+                        modelTuple.World.Translation = Vector3.Zero;
+                        modelTuple.World *= Matrix.CreateRotationY(2f * (float)gameTime.ElapsedGameTime.TotalSeconds);
+                        modelTuple.World.Translation = position;
+                        _models[i] = modelTuple;
+                    }
+                }
+                #endregion
+
                 _player.Update(gameTime, _models);
                 _enemy.Update(gameTime, _player.Position, _player.IsHidden);
                 _view = _player.View;

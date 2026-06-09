@@ -43,6 +43,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             // Habitaciones
             switch (room.Type)
             {
+                case RoomType.Entrance:
+                    Place("Items/PSX_Item_Shotgun", midC, midR, 0f, 50f, new Vector3(0, 0, -50f));
+                    break;
                 case RoomType.Bed:
                     // Cama perpendicular a la pared trasera
                     Place("Level/Bedroom/PSX_Bed", midC, rows - 1, 0f);
@@ -144,20 +147,20 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
                 case RoomType.Outdoor:
                     // Laberinto
-                    for (int r = 0; r < rows; r++)
-                    {
-                        for (int c = 0; c < cols; c++)
-                        {
-                            // Dejamos el centro libre
-                            if (Math.Abs(c - midC) <= 1 && Math.Abs(r - midR) <= 1) continue;
+                    //for (int r = 0; r < rows; r++)
+                    //{
+                    //    for (int c = 0; c < cols; c++)
+                    //    {
+                    //        // Dejamos el centro libre
+                    //        if (Math.Abs(c - midC) <= 1 && Math.Abs(r - midR) <= 1) continue;
 
-                            if ((r + c) % 2 == 0 && rng.Next(100) > 30) // 70% chance en celdas pares
-                            {
-                                string bush = rng.Next(3) switch { 0 => "Level/Outdoor/PSX_Bush", 1 => "Level/Outdoor/PSX_Bush2", _ => "Level/Outdoor/PSX_Bush3" };
-                                Place(bush, c, r);
-                            }
-                        }
-                    }
+                    //        if ((r + c) % 2 == 0 && rng.Next(100) > 30) // 70% chance en celdas pares
+                    //        {
+                    //            string bush = rng.Next(3) switch { 0 => "Level/Outdoor/PSX_Bush", 1 => "Level/Outdoor/PSX_Bush2", _ => "Level/Outdoor/PSX_Bush3" };
+                    //            Place(bush, c, r);
+                    //        }
+                    //    }
+                    //}
 
                     // Árbol tenebroso en el medio
                     Place("Level/Outdoor/LowPoly_Tree", midC, midR);
@@ -173,6 +176,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     // En los pasillos, generamos un barril oxidado random de vez en cuando para prender fuego
                     if (rng.Next(100) > 85)
                         Place("Miscellaneous/PSX_Rusty_Barell", rng.Next(cols), rng.Next(rows));
+                    break;
+                case RoomType.Prize:
+                    Place("Items/PSX_Item_Shotgun", midC, midR, 0f, 35f);
                     break;
             }
 

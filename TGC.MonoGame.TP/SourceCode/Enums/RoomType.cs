@@ -9,6 +9,7 @@
         Living,
         Outdoor,
         Hallway,
-        Entrance
+        Entrance,
+        Prize
     }
 }

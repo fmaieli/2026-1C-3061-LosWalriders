@@ -40,7 +40,6 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
             if (neighborCell == ' ' ||
                 neighborCell == '\0' ||
-                neighborCell == 'Z' ||
                 neighborCell == 'X')
                 return WallOpening.Solid();
 
@@ -59,7 +58,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             return cell switch
             {
                 'E' => (RoomType.Entrance, Color.SkyBlue, Color.LightBlue),          // Entrance
-                'Z' => (RoomType.Outdoor, Color.Red, Color.DarkRed),                 // Exit (ahora es Z porque se creo la referencia de Entrance)
+                'Z' => (RoomType.Prize, Color.Gold, Color.DarkGoldenrod),            // Exit (ahora es Z porque se creo la referencia de Entrance)
                 'H' => (RoomType.Hallway, Color.Yellow, Color.LightGoldenrodYellow),
                 'V' => (RoomType.Hallway, Color.DarkGoldenrod, Color.Goldenrod),     // Vents
                 'C' => (RoomType.Computer, Color.Gray, Color.DarkGray),
@@ -81,17 +80,44 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             WallColliders.Clear();
             ValidSpawnPoints.Clear();
 
-            string doorPath = "Items/PSX_Door";
+            #region Carga de modelos
+            // Puerta normal
+            string normalDoorPath = "Items/PSX_Door";
+            if (!modelCache.TryGetValue(normalDoorPath, out var normalDoorModel))
+            {
+                normalDoorModel = content.Load<Model>(TGCGame.ContentFolder3D + normalDoorPath);
+                ApplyCustomEffectToModel(normalDoorModel, effect);
+                modelCache[normalDoorPath] = normalDoorModel;
+            }
+
+            // Puerta para el PrizeRoom
+            string prizeDoorPath = "Items/PSX_Item_Door";
+            if (!modelCache.TryGetValue(prizeDoorPath, out var prizeDoorModel))
+            {
+                prizeDoorModel = content.Load<Model>(TGCGame.ContentFolder3D + prizeDoorPath);
+                ApplyCustomEffectToModel(prizeDoorModel, effect);
+                modelCache[prizeDoorPath] = prizeDoorModel;
+            }
+
+            // Candado bloqueado
+            string lockPath = "Items/PSX_Item_Lock_Locked";
+            if (!modelCache.TryGetValue(lockPath, out var lockModel))
+            {
+                lockModel = content.Load<Model>(TGCGame.ContentFolder3D + lockPath);
+                ApplyCustomEffectToModel(lockModel, effect);
+                modelCache[lockPath] = lockModel;
+            }
+            #endregion
 
             // Tomo el modelo en caso de ya estar en modelCache y si existe lo extraigo en doorModel
-            if (!modelCache.TryGetValue(doorPath, out var doorModel))
+            if (!modelCache.TryGetValue(normalDoorPath, out var doorModel))
             {
                 // Se carga la puerta
-                doorModel = content.Load<Model>(TGCGame.ContentFolder3D + doorPath);
+                doorModel = content.Load<Model>(TGCGame.ContentFolder3D + normalDoorPath);
                 ApplyCustomEffectToModel(doorModel, effect);
 
                 // Guardo el modelo en modelCache
-                modelCache[doorPath] = doorModel;
+                modelCache[normalDoorPath] = doorModel;
             }
 
             // Lista de puertas creadas
@@ -167,6 +193,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             bool[,] processedCell = new bool[rows, cols];
             var doorRegistry = new Dictionary<(int, int), List<HallwayDirection>>(); // Lista con las coordenadas donde se encuentran las puertas
             var occupiedAreas = new List<BoundingBox>();
+            var keySpawnPoints = new List<Vector3>();
 
             for (int z = 0; z < rows; z++)
             {
@@ -176,8 +203,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
                     char currentCell = mapLayout[z][x]; // Cell a procesar
 
-                    if (currentCell == ' ' || currentCell == 'P' ||
-                        currentCell == 'Z' || currentCell == 'X' ||
+                    if (currentCell == ' ' || currentCell == 'P' || currentCell == 'X' ||
                         HallwayGeneratorHelper.IsHallway(currentCell))
                     {
                         if (!HallwayGeneratorHelper.IsHallway(currentCell))
@@ -232,6 +258,12 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
                     // Guardo el centro como un valor valido de spawn para el enemigo
                     ValidSpawnPoints.Add(new Vector3(mergedWorldX, 0f, mergedWorldZ));
+
+                    // Spawn para las llaves, que no sean del tipo Entrance
+                    if (roomData.Value.Type != RoomType.Entrance)
+                    {
+                        keySpawnPoints.Add(new Vector3(mergedWorldX, 0f, mergedWorldZ));
+                    }
 
                     occupiedAreas.Add(new BoundingBox(
                         new Vector3(mergedWorldX - mergedWidthHalf, -10f, mergedWorldZ - mergedDepthHalf),
@@ -304,25 +336,42 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     var roomWorld = Matrix.CreateTranslation(mergedWorldX, 0f, mergedWorldZ);
                     rooms.Add((vertexBuffer, indexBuffer, primCount, roomWorld));
 
+                    // Poner la puerta dependiendo del tipo de habitacion (se hace para poner la puerta particular para PrizeRoom)
+                    string currentDoorPath = normalDoorPath;
+                    Model currentDoorModel = normalDoorModel;
+
+                    // Variables para los candados
+                    Model currentLockModel = null;
+                    string currentLockPath = null;
+
+                    // Se cambia el modelo si es PrizeRoom y asignamos los candados
+                    if (roomData.Value.Type == RoomType.Prize)
+                    {
+                        currentDoorPath = prizeDoorPath;
+                        currentDoorModel = prizeDoorModel;
+                        currentLockModel = lockModel;
+                        currentLockPath = lockPath;
+                    }
+
                     // Pared Frontal
-                    LevelGeneratorHelper.PlaceDoorModel(frontOpening, new Vector3(doorOffsetX, 0, mergedDepthHalf), 0f,
+                    PlaceDoorModel(frontOpening, new Vector3(doorOffsetX, 0, mergedDepthHalf), 0f,
                         z + heightCells - 1, x + widthCells / 2, z + heightCells, x + widthCells / 2,
-                        placedDoors, mergedWorldX, mergedWorldZ, doorModel, doorPath, models);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, normalDoorPath, models, currentLockModel, currentLockPath);
 
                     // Pared Trasera
-                    LevelGeneratorHelper.PlaceDoorModel(backOpening, new Vector3(doorOffsetX, 0, -mergedDepthHalf), MathHelper.Pi,
+                    PlaceDoorModel(backOpening, new Vector3(doorOffsetX, 0, -mergedDepthHalf), MathHelper.Pi,
                         z, x + widthCells / 2, z - 1, x + widthCells / 2,
-                        placedDoors, mergedWorldX, mergedWorldZ, doorModel, doorPath, models);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, normalDoorPath, models, currentLockModel, currentLockPath);
 
                     // Pared Izquierda
-                    LevelGeneratorHelper.PlaceDoorModel(leftOpening, new Vector3(-mergedWidthHalf, 0, doorOffsetZ), -MathHelper.PiOver2,
+                    PlaceDoorModel(leftOpening, new Vector3(-mergedWidthHalf, 0, doorOffsetZ), -MathHelper.PiOver2,
                         z + heightCells / 2, x, z + heightCells / 2, x - 1,
-                        placedDoors, mergedWorldX, mergedWorldZ, doorModel, doorPath, models);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, normalDoorPath, models, currentLockModel, currentLockPath);
 
                     // Pared Derecha
-                    LevelGeneratorHelper.PlaceDoorModel(rightOpening, new Vector3(mergedWidthHalf, 0, doorOffsetZ), MathHelper.PiOver2,
+                    PlaceDoorModel(rightOpening, new Vector3(mergedWidthHalf, 0, doorOffsetZ), MathHelper.PiOver2,
                         z + heightCells / 2, x + widthCells - 1, z + heightCells / 2, x + widthCells,
-                        placedDoors, mergedWorldX, mergedWorldZ, doorModel, doorPath, models);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, normalDoorPath, models, currentLockModel, currentLockPath );
 
                     // Renderizado de modelos por habitacion
                     IRoomAssets roomTypeInstance = RoomFactory.Create(roomData.Value.Type);
@@ -353,6 +402,36 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     }
                 }
             }
+
+            #region Generacion de llaves - Random en las habitaciones
+            string keyPath = "Items/PSX_Item_Key";
+            if (!modelCache.TryGetValue(keyPath, out var keyModel))
+            {
+                keyModel = content.Load<Model>(TGCGame.ContentFolder3D + keyPath);
+                ApplyCustomEffectToModel(keyModel, effect);
+                modelCache[keyPath] = keyModel;
+            }
+
+            for (int i = 0; i < 3; i++)
+            {
+                // Se usa la lista de spawn de las llaves
+                if (keySpawnPoints.Count > 0)
+                {
+                    // Habitacion aleatoria
+                    int randomIndex = rng.Next(keySpawnPoints.Count);
+                    Vector3 spawnPoint = keySpawnPoints[randomIndex];
+
+                    // Se elimina la habitacion para que no puedan aparecer 2 llaves en el mismo lugar
+                    keySpawnPoints.RemoveAt(randomIndex);
+
+                    // Posicion de la llave flotando
+                    Vector3 keyPos = new Vector3(spawnPoint.X, 35f, spawnPoint.Z);
+                    Matrix keyWorld = Matrix.CreateScale(0.5f) * Matrix.CreateRotationY((float)rng.NextDouble() * MathHelper.TwoPi) * Matrix.CreateTranslation(keyPos);
+
+                    models.Add((keyModel, keyWorld, keyPath));
+                }
+            }
+            #endregion
 
             // Terminada la generacion de las habitaciones genero los pasillos
             HallwayGeneratorHelper.GenerateHallways(
@@ -434,12 +513,14 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             Vector3 localPos,
             float rotY,
             int zFirstRoom, int xFirstRoom, int zSecondRoom, int xSecondRoom, // Coordenadas de las dos habitaciones que se conectan
-            HashSet<string> placedDoors,    // Registro de puertas ya colocadas para evitar duplicados
-            float mergedWorldX,             // Posicion del centro X de la habitacion en el mundo
-            float mergedWorldZ,             // Posición del centro Z de la habitacion en el mundo
-            Model doorModel,                // Modelo de la puerta
-            string doorPath,                // Path del modelo
-            List<(Model, Matrix, string)> models) // La lista de modelos a renderizar
+            HashSet<string> placedDoors,            // Registro de puertas ya colocadas para evitar duplicados
+            float mergedWorldX,                     // Posicion del centro X de la habitacion en el mundo
+            float mergedWorldZ,                     // Posición del centro Z de la habitacion en el mundo
+            Model doorModel,                        // Modelo de la puerta
+            string doorPath,                        // Path del modelo
+            List<(Model, Matrix, string)> models,   // La lista de modelos a renderizar
+            Model lockModel = null,                 // Modelo candado
+            string lockPath = null)                 // Path candado
         {
             // Si no es una puerta, no se hace nada
             if (opening.Type != WallType.Door) return;
@@ -465,6 +546,26 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
             // Agrero el modelo de la puerta a models para renderizarlo con el resto de modelos
             models.Add((doorModel, doorWorld, doorPath));
+
+            // Candados uno encima del otro
+            if (lockModel != null)
+            {
+                // Donde se encuentra la derecha del modelo de la puerta
+                Vector3 rightDir = Vector3.Transform(Vector3.Right, Matrix.CreateRotationY(rotY));
+
+                // Posicion desde el centro de la puerta
+                Vector3 lockBasePos = doorWorld.Translation + (rightDir * 45f) + new Vector3(0, 40f, 0);
+
+                for (int i = 0; i < 3; i++)
+                {
+                    // Cada candado se dibuja 15 unidades mas arriba que el anterior
+                    Matrix lockWorld = 
+                        Matrix.CreateScale(0.06f) * 
+                        Matrix.CreateRotationY(rotY + MathHelper.PiOver2) * 
+                        Matrix.CreateTranslation(lockBasePos + new Vector3(0, 30f * i, 0));
+                    models.Add((lockModel, lockWorld, lockPath));
+                }
+            }
         }
 
         /// <summary>
