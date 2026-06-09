@@ -1250,6 +1250,12 @@
 /processorParam:Quality=Best
 /build:Sounds/car_door_open.mp3
 
+#begin Sounds/keys.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Sounds/keys.mp3
+
 #begin Sounds/open_door.mp3
 /importer:Mp3Importer
 /processor:SoundEffectProcessor
@@ -1262,12 +1268,12 @@
 /processorParam:Quality=Best
 /build:Sounds/terror_scream.mp3
 
-#begin SpriteFonts/HUD_Timer.spritefont
+#begin SpriteFonts/HUD.spritefont
 /importer:FontDescriptionImporter
 /processor:FontDescriptionProcessor
 /processorParam:PremultiplyAlpha=True
 /processorParam:TextureFormat=Compressed
-/build:SpriteFonts/HUD_Timer.spritefont
+/build:SpriteFonts/HUD.spritefont
 
 #begin Textures/blood_splash.png
 /importer:TextureImporter

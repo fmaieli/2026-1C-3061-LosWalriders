@@ -259,8 +259,8 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     // Guardo el centro como un valor valido de spawn para el enemigo
                     ValidSpawnPoints.Add(new Vector3(mergedWorldX, 0f, mergedWorldZ));
 
-                    // Spawn para las llaves, que no sean del tipo Entrance
-                    if (roomData.Value.Type != RoomType.Entrance)
+                    // Spawn para las llaves, que no sean del tipo Entrance o Prize
+                    if (roomData.Value.Type != RoomType.Entrance || roomData.Value.Type != RoomType.Prize)
                     {
                         keySpawnPoints.Add(new Vector3(mergedWorldX, 0f, mergedWorldZ));
                     }
@@ -554,7 +554,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                 Vector3 rightDir = Vector3.Transform(Vector3.Right, Matrix.CreateRotationY(rotY));
 
                 // Posicion desde el centro de la puerta
-                Vector3 lockBasePos = doorWorld.Translation + (rightDir * 45f) + new Vector3(0, 40f, 0);
+                Vector3 lockBasePos = doorWorld.Translation + (rightDir * 45f) + new Vector3(0, 25f, 0);
 
                 for (int i = 0; i < 3; i++)
                 {

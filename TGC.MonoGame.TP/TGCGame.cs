@@ -53,7 +53,6 @@ public class TGCGame : Game
 
     // Menu
     private GameState _gameState = GameState.Menu;
-
     private MenuScreen _menuScreen = new MenuScreen();
 
     // Animacion de camera
@@ -139,7 +138,7 @@ public class TGCGame : Game
         _pixelTexture.SetData(new[] { Color.White });
 
         // SpriteFont
-        _spriteFont = Content.Load<SpriteFont>(ContentFolderSpriteFonts + "HUD_Timer");
+        _spriteFont = Content.Load<SpriteFont>(ContentFolderSpriteFonts + "HUD");
 
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
@@ -481,6 +480,34 @@ public class TGCGame : Game
             _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White);
             #endregion
 
+            #region Texto de Objetivo
+            
+            string objectiveText = string.Empty;
+            float textScale = 0.55f;
+            // Evaluamos si el jugador ya tiene las 3 llaves para cambiar el texto
+            if (_player.CollectedKeys < 3)
+            {
+                textScale = 0.55f;
+                objectiveText = "Busca y recolecta todas las llaves en la mansión";
+            }
+            else
+            {
+                textScale = 0.45f;
+                objectiveText = "Busca tu premio en la habitación del fondo de la mansión";
+            }
+
+            // Ubicado arriba a la izquierda
+            Vector2 objectivePosition = new Vector2(20f, 20f);
+
+            // Sombra del texto
+            _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition + new Vector2(2, 2),
+                                    Color.Black, 0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
+
+            // Texto objetivo
+            _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition,
+                                    Color.White, 0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
+            #endregion
+
             #region Barra de durabilidad de luces
             if (_player.IsLightActive)
             {
@@ -502,12 +529,69 @@ public class TGCGame : Game
                 _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
             }
             #endregion
+
+            #region Llaves Recolectadas
+            // Texto arriba a la derecha HUD
+            string keysText = "Llaves: ";
+
+            Vector2 keysPosition = new Vector2(GraphicsDevice.Viewport.Width - 250f, 25f);
+
+            _spriteBatch.DrawString(_spriteFont, keysText, keysPosition + new Vector2(2, 2), Color.Black);
+            _spriteBatch.DrawString(_spriteFont, keysText, keysPosition, Color.White);
+            #endregion
         }
 
         _spriteBatch.End();
 
         // Restauro DepthStencilState tras usar SpriteBatch
         GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+
+        #region Dibujo los modelos de las llaves
+        if (_gameState == GameState.Playing)
+        {
+            // Limpio la profundidad asi se dibujan las llaves por arriba del resto de modelos
+            GraphicsDevice.Clear(ClearOptions.DepthBuffer, Color.Black, 1.0f, 0);
+
+            // Creamos una cámara ortográfica. (1 unidad de espacio = 1 píxel en pantalla)
+            Matrix uiProjection = Matrix.CreateOrthographicOffCenter(0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height, 0, 0.1f, 100f);
+            Matrix uiView = Matrix.CreateLookAt(new Vector3(0, 0, 10f), Vector3.Zero, Vector3.Up);
+
+            if (_modelCache.TryGetValue("Items/PSX_Item_Key", out var keyModel))
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    // Posicion de dibujo de las llaves
+                    float xPos = GraphicsDevice.Viewport.Width - 100f + (45f * i);
+                    float yPos = 60f; // Altura a la que se dibujan las llaves
+
+                    Matrix keyWorld = Matrix.CreateScale(1f) *                                                  // Tamaño del HUD
+                                      Matrix.CreateRotationZ(MathHelper.PiOver2) *                              // Rotado en Z para que el modelo se note mas
+                                      Matrix.CreateRotationY((float)gameTime.TotalGameTime.TotalSeconds * 2f) * // Se giran sobre Y para darle dinamismo al HUD
+                                      Matrix.CreateTranslation(xPos, yPos, 0f);
+
+                    // Por defecto tienen el color negro hasta que se recolecta alguna llave pintandolas de dorado
+                    Vector3 keyColor = i < _player.CollectedKeys ? Color.Gold.ToVector3() : Color.Black.ToVector3();
+
+                    // Dibujado de las llaves
+                    foreach (var mesh in keyModel.Meshes)
+                    {
+                        foreach (var part in mesh.MeshParts)
+                        {
+                            var fx = (Effect)part.Effect;
+                            fx.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * keyWorld);
+                            fx.Parameters["View"]?.SetValue(uiView);
+                            fx.Parameters["Projection"]?.SetValue(uiProjection);
+                            fx.Parameters["UseVertexColor"]?.SetValue(false);
+
+                            // Forzamos el color silueta negra o dorado
+                            fx.Parameters["DiffuseColor"]?.SetValue(keyColor);
+                        }
+                        mesh.Draw();
+                    }
+                }
+            }
+        }
+        #endregion
 
         #endregion
 
@@ -539,8 +623,8 @@ public class TGCGame : Game
     {
         // Modifico Rasterizer para que solo dibuje las caras internas del modelo
         GraphicsDevice.RasterizerState = new RasterizerState { CullMode = CullMode.CullClockwiseFace };
-        // Diferencio el escalado del modelo para que se note mas el borde para match box
-        float outlineScale = name.Contains("Match_Box") ? 1.20f : 1.03f;
+        // Diferencio el escalado del modelo para que se note mas el borde para match box y lock
+        float outlineScale = name.Contains("Match_Box") || name.Contains("Lock") ? 1.20f : 1.03f;
 
         Matrix outlineWorld = Matrix.CreateScale(outlineScale) * world;
 

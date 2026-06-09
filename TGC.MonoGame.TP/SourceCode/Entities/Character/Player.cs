@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using TGC.MonoGame.TP.SourceCode.Components;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities.Character
@@ -14,6 +15,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
         public float Rotation { get; private set; } = 0f;
         public bool IsHidden { get; set; } = false; // Estado que valida si se encuentra escondido o no
         public int? InteractableModelIndex { get; private set; } = null; // Indice para saber cual es el modelo con el cual el jugadr interactua
+        public int CollectedKeys { get; private set; } = 0;
         public bool IsLightActive => (nokiaLight != null && nokiaLight.IsActive) || (matchLight != null && matchLight.IsActive);
         public float CurrentLightDurabilityPercentage // Porcentaje de durabilidad
         {
@@ -41,6 +43,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
         private Model _armsModel;
         private Effect _armsEffect;
+        private Model _lockOpenModel;
 
         private LightSource nokiaLight;
         private LightSource matchLight;
@@ -61,6 +64,16 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
             nokiaLight.LoadContent(content, effect);
             matchLight.LoadContent(content, effect);
+
+            // Cargo el modelo del candado abierto
+            _lockOpenModel = content.Load<Model>("Models/Items/PSX_Item_Lock_Open");
+            foreach (var mesh in _lockOpenModel.Meshes)
+            {
+                foreach (var part in mesh.MeshParts)
+                {
+                    part.Effect = effect.Clone();
+                }
+            }
         }
 
         public void DrawArms(Matrix view, Matrix projection, GraphicsDevice graphicsDevice)
@@ -125,7 +138,10 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                 for (int i = 0; i < models.Count; i++)
                 {
                     var model = models[i];
-                    if (model.Name.Contains("PSX_Wooden_Closet") || model.Name.Contains("PSX_Item_Match_Box"))
+                    if (model.Name.Contains("PSX_Wooden_Closet") ||
+                        model.Name.Contains("PSX_Item_Match_Box") ||
+                        model.Name.Contains("PSX_Item_Lock_Locked") ||
+                        model.Name.Contains("PSX_Item_Door"))
                     {
                         float distanceToModel = Vector3.Distance(Position, model.World.Translation);
                         if (distanceToModel < closestDistance)
@@ -204,6 +220,28 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             {
                 ApplyNormalMovement(movement);
             }
+
+            #region Recoleccion de llaves a traves de colisiones
+            // Esfera del jugador
+            BoundingSphere playerPickupSphere = new BoundingSphere(Position, 25f);
+
+            for (int i = models.Count - 1; i >= 0; i--)
+            {
+                if (models[i].Name.Contains("PSX_Item_Key"))
+                {
+                    // Esfera de colision para las llaves
+                    BoundingSphere keySphere = new BoundingSphere(models[i].World.Translation, 20f);
+
+                    // Recolecto la llave
+                    if (playerPickupSphere.Intersects(keySphere))
+                    {
+                        CollectedKeys++;
+                        models.RemoveAt(i); // Elimino la llave del mundo
+                        Debug.WriteLine($"¡Llave recolectada! ({CollectedKeys}/3)");
+                    }
+                }
+            }
+            #endregion
 
             View = Matrix.CreateLookAt(Position, Position + Vector3.Transform(Vector3.Forward, cameraRotation), Vector3.Up);
             _previousKeyboardState = keyboardState;
@@ -301,6 +339,78 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                         else
                         {
                             Debug.WriteLine("Aun no se te acabaron los fosforos");
+                        }
+                    }
+                    
+                    else if (model.Name.Contains("PSX_Item_Lock_Locked") || model.Name.Contains("PSX_Item_Door"))
+                    {
+                        var lockIndices = new List<int>();
+                        for (int i = 0; i < models.Count; i++)
+                        {
+                            if (models[i].Name.Contains("PSX_Item_Lock_Locked") || models[i].Name.Contains("PSX_Item_Lock_Open"))
+                            {
+                                lockIndices.Add(i);
+                            }
+                        }
+
+                        // Ordeno de abajo hacia arriba en el eje Y
+                        lockIndices.Sort((a, b) => models[a].World.Translation.Y
+                                                    .CompareTo(models[b].World.Translation.Y));
+
+                        // Reviso la lista de candados y segun la cantidad de llaves se abren
+                        for (int i = 0; i < lockIndices.Count; i++)
+                        {
+                            int index = lockIndices[i];
+                            bool hasEnoughKeys = CollectedKeys >= (i + 1);
+                            bool isLocked = models[index].Name.Contains("PSX_Item_Lock_Locked");
+
+                            // Si hay suficientes llaves para este candado y sigue cerrado, lo abrimos
+                            if (hasEnoughKeys && isLocked)
+                            {
+                                Matrix world = models[index].World;
+                                Vector3 position = world.Translation;
+
+                                // Centro, lo escalo y lo vuelvo al lugar donde deberia de aparecer
+                                world.Translation = Vector3.Zero;
+                                world = Matrix.CreateScale(5f) * world;
+                                world.Translation = position;
+
+                                // Guardamos el nuevo estado del candado
+                                models[index] = (_lockOpenModel, world, "Items/PSX_Item_Lock_Open");
+                                Debug.WriteLine($"¡Candado {i + 1} desbloqueado!");
+                            }
+                        }
+
+                        // Interaccion con la puerta del premio
+                        if (model.Name.Contains("PSX_Item_Door"))
+                        {
+                            // Valido que todos los candados esten abiertos
+                            bool allLocksOpen = lockIndices.Count > 0 &&
+                                                lockIndices.All(idx => !models[idx].Name.Contains("PSX_Item_Lock_Locked"));
+
+                            if (allLocksOpen)
+                            {
+                                Debug.WriteLine("¡Ganaste, conseguiste el premio!");
+
+                                // Tomamos el modelo de la puerta actual
+                                var door = models[InteractableModelIndex.Value];
+                                Vector3 doorPosition = door.World.Translation;
+
+                                // Roto 90° sobre su eje para abrirla
+                                door.World.Translation = Vector3.Zero;
+                                door.World *= Matrix.CreateRotationY(-MathHelper.PiOver2);
+                                door.World.Translation = doorPosition;
+
+                                // Cambio el nombre y guardo la puerta modificada
+                                door.Name = "Items/PSX_Item_Door_Opened";
+                                models[InteractableModelIndex.Value] = door;
+
+                                InteractableModelIndex = null;
+                            }
+                            else
+                            {
+                                Debug.WriteLine("La puerta está firmemente trabada por los candados.");
+                            }
                         }
                     }
                 }
