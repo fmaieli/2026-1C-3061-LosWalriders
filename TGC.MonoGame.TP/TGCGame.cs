@@ -69,9 +69,10 @@ public class TGCGame : Game
     private Effect _postProcessEffect;
     private Texture2D _overlayTexture;
 
-    // 2D
+    // 2D - Skybox
     private Texture2D _pixelTexture;
     private SpriteFont _spriteFont;
+    private SkyBox _skyBox;
 
     // Musica
     private Song _menuMusic;
@@ -143,6 +144,13 @@ public class TGCGame : Game
         // SpriteFont
         _spriteFont = Content.Load<SpriteFont>(ContentFolderSpriteFonts + "HUD");
 
+        // Skybox
+        var skyBoxModel = Content.Load<Model>(ContentFolder3D + "skybox/cube");
+        var skyBoxTexture = Content.Load<TextureCube>(ContentFolderTextures + "skyboxes/skybox_night");
+
+        var skyBoxEffect = Content.Load<Effect>(ContentFolderEffects + "SkyBox");
+        _skyBox = new SkyBox(skyBoxModel, skyBoxTexture, skyBoxEffect, 1500f);
+        
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
@@ -362,6 +370,24 @@ public class TGCGame : Game
         #endregion
 
         GraphicsDevice.Clear(Color.White);
+
+        #region Skybox
+        // Configuración para el Skybox
+        var originalRasterizerState = GraphicsDevice.RasterizerState;
+        var rasterizerState = new RasterizerState();
+        rasterizerState.CullMode = CullMode.None;
+        GraphicsDevice.RasterizerState = rasterizerState;
+
+        // Dibujado de skybox
+        // Uso el shader de Skybox
+        Matrix viewSkyBox = _view;
+        viewSkyBox.Translation = Vector3.Zero; // Esto fija el skybox al centro de la camara
+        _skyBox.Draw(viewSkyBox, _projection, Vector3.Zero);
+
+        // Restauro el estado de Rasterizer
+        GraphicsDevice.RasterizerState = originalRasterizerState;
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+        #endregion
 
         // Ya no se fija en VertexBuffer y IndexBuffer sino en la cantidad de habitaciones que existan
         if (_effect == null || _rooms.Count == 0)
