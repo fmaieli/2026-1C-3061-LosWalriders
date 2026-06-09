@@ -26,7 +26,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
             Color floorColor, Color ceilingColor, Color frontWallColor,
             Color backWallColor, Color leftWallColor, Color rightWallColor,
             WallOpening frontOpening, WallOpening backOpening,
-            WallOpening leftOpening, WallOpening rightOpening)
+            WallOpening leftOpening, WallOpening rightOpening,
+            bool hasCeiling = true)
         {
             var vertices = new List<VertexPositionColor>();
             var indices = new List<ushort>();
@@ -43,7 +44,10 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
             // Floor
             vertices.AddRange(_floor.CreateFloor(width, depth, floorColor));
             // Ceiling
-            vertices.AddRange(_ceiling.CreateCeiling(width, height, depth, ceilingColor));
+            if (hasCeiling)
+            {
+                vertices.AddRange(_ceiling.CreateCeiling(width, height, depth, ceilingColor));
+            }
 
             // Indices para Floor y Ceiling
             ushort[] quad = { 0, 1, 2, 0, 2, 3 };

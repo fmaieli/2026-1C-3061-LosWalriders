@@ -308,6 +308,8 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     AddWallColliders(new Vector3(mergedWorldX, 0, mergedWorldZ), mergedWidthHalf, mergedDepthHalf, roomHeight,
                                      frontOpening, backOpening, leftOpening, rightOpening);
 
+                    bool isOutdoor = roomData.Value.Type == RoomType.Outdoor;
+
                     // Creo la habitacion
                     var room = new Room();
                     var mesh = room.CreateRoom(
@@ -323,7 +325,8 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                         frontOpening: frontOpening, 
                         backOpening: backOpening,
                         leftOpening: leftOpening, 
-                        rightOpening: rightOpening
+                        rightOpening: rightOpening,
+                        hasCeiling: !isOutdoor
                     );
 
                     var vertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionColor), mesh.Vertices.Length, BufferUsage.WriteOnly);

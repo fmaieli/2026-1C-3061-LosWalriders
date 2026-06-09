@@ -123,7 +123,7 @@ public class TGCGame : Game
         _world = Matrix.Identity;
         _view = Matrix.CreateLookAt(Vector3.UnitZ * 150, Vector3.Zero, Vector3.Up);
         _projection =
-            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 2500);
+            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 5000);
 
         base.Initialize();
     }
@@ -149,7 +149,7 @@ public class TGCGame : Game
         var skyBoxTexture = Content.Load<TextureCube>(ContentFolderTextures + "skyboxes/skybox_night");
 
         var skyBoxEffect = Content.Load<Effect>(ContentFolderEffects + "SkyBox");
-        _skyBox = new SkyBox(skyBoxModel, skyBoxTexture, skyBoxEffect, 1500f);
+        _skyBox = new SkyBox(skyBoxModel, skyBoxTexture, skyBoxEffect, 3000f);
         
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
