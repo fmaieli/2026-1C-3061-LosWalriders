@@ -19,7 +19,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             int cols = Math.Max(3, (int)(roomWidth * 2 / cellSize));
             int rows = Math.Max(3, (int)(roomDepth * 2 / cellSize));
 
-            // Centro de la habitación
+            // Centro de la habitacion
             int midC = cols / 2;
             int midR = rows / 2;
 
@@ -43,6 +43,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             // Habitaciones
             switch (room.Type)
             {
+                case RoomType.Entrance:
+                    Place("Items/PSX_Item_Shotgun", midC, midR, 0f, 50f, new Vector3(0, 0, -50f));
+                    break;
                 case RoomType.Bed:
                     // Cama perpendicular a la pared trasera
                     Place("Level/Bedroom/PSX_Bed", midC, rows - 1, 0f);
@@ -107,27 +110,39 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     break;
 
                 case RoomType.Computer:
-                    // Laberinto de mesas (filas intercaladas)
-                    for (int r = 1; r < rows - 1; r += 2)
+                    for (int r = 1; r < rows - 1; r += 3)
                     {
-                        for (int c = 0; c < cols; c++)
-                        {
-                            // Dejamos un hueco al azar para que sea laberinto transitable
-                            if (c == rng.Next(cols)) continue;
+                        // Se dibujan los modelos en 3 columnas, izquierda, centro y derecha
+                        int leftColumn = 1;
+                        int centerColumn = cols / 2;
+                        int rightColumn = cols - 2;
 
-                            // Usamos mesa de Living como placeholder
+                        int[] tableCols = { leftColumn, centerColumn, rightColumn };
+
+                        // Conjunto de mesa, PC y silla
+                        foreach (int c in tableCols)
+                        {
                             Place("Level/Living/PSX_Wooden_Table", c, r);
-                            // PC sobre la mesa
                             Place("Level/Computer/PSX_Dirty_Old_PC", c, r, 0f, 35f);
-                            // Silla metida debajo
                             Place("Level/Computer/PSX_Computer_Chair", c, r, MathHelper.Pi, 0f, new Vector3(0, 0, 10f));
                         }
-                    }
 
-                    // Papeles bloqueando pasillos random
-                    for (int i = 0; i < 4; i++)
-                    {
-                        Place("Miscellaneous/PSX_Paper_Stack", rng.Next(cols), rng.Next(rows));
+                        // Se bloquea aleatoriamente el hueco de la izquierda o el de la derecha entre el conjunto de objetos
+                        // Nunca se deben de bloquear ambos espacios para dejar pasar
+                        bool blockLeftGap = rng.Next(2) == 0;
+
+                        if (blockLeftGap)
+                        {
+                            // Colocamos el papel justo en medio del pasillo izquierdo
+                            int gapColumn = (leftColumn + centerColumn) / 2;
+                            Place("Miscellaneous/PSX_Paper_Stack", gapColumn, r);
+                        }
+                        else
+                        {
+                            // Colocamos el papel justo en medio del pasillo derecho
+                            int gapColumn = (centerColumn + rightColumn) / 2;
+                            Place("Miscellaneous/PSX_Paper_Stack", gapColumn, r);
+                        }
                     }
                     break;
 
@@ -144,20 +159,20 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
                 case RoomType.Outdoor:
                     // Laberinto
-                    for (int r = 0; r < rows; r++)
-                    {
-                        for (int c = 0; c < cols; c++)
-                        {
-                            // Dejamos el centro libre
-                            if (Math.Abs(c - midC) <= 1 && Math.Abs(r - midR) <= 1) continue;
+                    //for (int r = 0; r < rows; r++)
+                    //{
+                    //    for (int c = 0; c < cols; c++)
+                    //    {
+                    //        // Dejamos el centro libre
+                    //        if (Math.Abs(c - midC) <= 1 && Math.Abs(r - midR) <= 1) continue;
 
-                            if ((r + c) % 2 == 0 && rng.Next(100) > 30) // 70% chance en celdas pares
-                            {
-                                string bush = rng.Next(3) switch { 0 => "Level/Outdoor/PSX_Bush", 1 => "Level/Outdoor/PSX_Bush2", _ => "Level/Outdoor/PSX_Bush3" };
-                                Place(bush, c, r);
-                            }
-                        }
-                    }
+                    //        if ((r + c) % 2 == 0 && rng.Next(100) > 30) // 70% chance en celdas pares
+                    //        {
+                    //            string bush = rng.Next(3) switch { 0 => "Level/Outdoor/PSX_Bush", 1 => "Level/Outdoor/PSX_Bush2", _ => "Level/Outdoor/PSX_Bush3" };
+                    //            Place(bush, c, r);
+                    //        }
+                    //    }
+                    //}
 
                     // Árbol tenebroso en el medio
                     Place("Level/Outdoor/LowPoly_Tree", midC, midR);
@@ -173,6 +188,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     // En los pasillos, generamos un barril oxidado random de vez en cuando para prender fuego
                     if (rng.Next(100) > 85)
                         Place("Miscellaneous/PSX_Rusty_Barell", rng.Next(cols), rng.Next(rows));
+                    break;
+                case RoomType.Prize:
+                    Place("Items/PSX_Item_Shotgun", midC, midR, 0f, 35f);
                     break;
             }
 

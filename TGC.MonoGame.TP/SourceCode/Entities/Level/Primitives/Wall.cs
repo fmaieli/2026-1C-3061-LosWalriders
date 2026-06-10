@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using System.Collections.Generic;
 using TGC.MonoGame.TP.SourceCode.Enums;
+using TGC.MonoGame.TP.SourceCode.Geometries;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
 {

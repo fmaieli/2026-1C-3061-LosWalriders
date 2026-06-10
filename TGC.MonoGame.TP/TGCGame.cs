@@ -1,9 +1,14 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Media;
 using System.Collections.Generic;
-using TGC.MonoGame.TP.SourceCode.Entities;
+using TGC.MonoGame.TP.SourceCode.Entities.Character;
+using TGC.MonoGame.TP.SourceCode.Enums;
+using TGC.MonoGame.TP.SourceCode.Geometries;
 using TGC.MonoGame.TP.SourceCode.Helpers;
+using TGC.MonoGame.TP.SourceCode.Screens;
 
 namespace TGC.MonoGame.TP;
 
@@ -29,8 +34,14 @@ public class TGCGame : Game
     private Matrix _projection;
 
     private Effect _effect;
+    private KeyboardState _previousKeyboardState;
 
-    private readonly List<(VertexBuffer VertexBuffer, IndexBuffer IndexBuffer, int PrimitiveCount, Matrix World)> _rooms = new();
+    private readonly List<(
+        VertexBuffer VertexBuffer,
+        IndexBuffer IndexBuffer, 
+        int PrimitiveCount, 
+        Matrix World, 
+        RoomType Type)> _rooms = new();
     private readonly Dictionary<string, Model> _modelCache = new();
     private readonly List<(Model Model, Matrix World, string Name)> _models = new();
 
@@ -42,6 +53,46 @@ public class TGCGame : Game
     private int _groundPrimitiveCount;
 
     private readonly List<(Model Model, Matrix World, string Name)> _trees = new();
+    private Effect _hallwayEffect;
+    private Texture2D _woodFloorTexture;
+    private Texture2D _concreteWallTexture;
+
+    private float _gameTimer = 300f; // 5 Minutos (en segundos)
+    private bool _isGameOver = false;
+    private float _timeTaken = 0f;
+
+    // Menu - Victory - GameOver
+    private GameState _gameState = GameState.Menu;
+    private MenuScreen _menuScreen = new MenuScreen();
+    private VictoryScreen _victoryScreen = new VictoryScreen();
+    private GameOverScreen _gameOverScreen = new GameOverScreen();
+
+    // Animacion de camera
+    private Vector3 _menuCameraPosition;
+    private Vector3 _menuCameraTarget;
+    private float _transitionProgress = 0f;
+
+    // Post-Processing
+    private RenderTarget2D _sceneRenderTarget;
+    private FullScreenQuad _fullScreenQuad;
+    private Effect _postProcessEffect;
+    private Texture2D _overlayTexture;
+
+    // 2D - Skybox
+    private Texture2D _pixelTexture;
+    private SpriteFont _spriteFont;
+    private SkyBox _skyBox;
+
+    // Musica
+    private Song _menuMusic;
+    private Song _gameMusic;
+
+    // Efectos de sonido
+    private SoundEffect _carDoorOpen;
+    private SoundEffect _carDoorClose;
+    private bool _hasPlayedDoorClose = false;
+    private SoundEffect _terrorScream;
+    private float _screamTimer = 60f;
 
     /// <summary>
     ///     Constructor del juego.
@@ -81,7 +132,7 @@ public class TGCGame : Game
         _world = Matrix.Identity;
         _view = Matrix.CreateLookAt(Vector3.UnitZ * 150, Vector3.Zero, Vector3.Up);
         _projection =
-            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 2500);
+            Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 5000);
 
         base.Initialize();
     }
@@ -96,6 +147,28 @@ public class TGCGame : Game
         // Aca es donde deberiamos cargar todos los contenido necesarios antes de iniciar el juego.
         _spriteBatch = new SpriteBatch(GraphicsDevice);
 
+        _pixelTexture = new Texture2D(GraphicsDevice, 1, 1);
+        _pixelTexture.SetData(new[] { Color.White });
+
+        // Textures
+        _hallwayEffect = Content.Load<Effect>(ContentFolderEffects + "HallwayTextures");
+        _woodFloorTexture = Content.Load<Texture2D>(ContentFolderTextures + "old-wood-plank");
+        _concreteWallTexture = Content.Load<Texture2D>(ContentFolderTextures + "old-concrete-wall");
+
+        _hallwayEffect.Parameters["WallTexture"]?.SetValue(_concreteWallTexture);
+        _hallwayEffect.Parameters["FloorTexture"]?.SetValue(_woodFloorTexture);
+        _hallwayEffect.Parameters["Tiling"]?.SetValue(new Vector2(0.01f, 0.01f));
+
+        // SpriteFont
+        _spriteFont = Content.Load<SpriteFont>(ContentFolderSpriteFonts + "HUD");
+
+        // Skybox
+        var skyBoxModel = Content.Load<Model>(ContentFolder3D + "skybox/cube");
+        var skyBoxTexture = Content.Load<TextureCube>(ContentFolderTextures + "skyboxes/skybox_night");
+
+        var skyBoxEffect = Content.Load<Effect>(ContentFolderEffects + "SkyBox");
+        _skyBox = new SkyBox(skyBoxModel, skyBoxTexture, skyBoxEffect, 3000f);
+        
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
@@ -105,24 +178,50 @@ public class TGCGame : Game
         _enemy.LoadContent(Content, _effect);
         // En un principio dibujo el enemigo cerca para comprobar que este funcionando correctamente
         // Revisar donde deberia de spawnear dentro del mapa
-        _enemy.Position = _player.Position + new Vector3(0, 0, -250f);
+        _enemy.Position = _player.Position + new Vector3(0, 0, -500f);
 
-        // Delegamos TODA la generacion del nivel al Helper
-        LevelGeneratorHelper.GenerateLevel(
-            GraphicsDevice,
-            Content,
-            _effect,
-            _player.Position,
-            _modelCache,
-            _rooms,
-            _models,
-            _trees,
-            out _groundVertexBuffer,
-            out _groundIndexBuffer,
-            out _groundPrimitiveCount
-        );
+        // Busco donde esta el jugador y lo apunto al enemigo hacia él
+        Vector3 directionToPlayer = _player.Position - _enemy.Position;
+        directionToPlayer.Normalize();
+        _enemy.Forward = directionToPlayer;
+        
+        LoadLevel();
 
         Window.Title = $"TGC.MonoGame.TP - Models: {_models.Count + _trees.Count}";
+
+        #region Post-Processing
+        _fullScreenQuad = new FullScreenQuad(GraphicsDevice);
+
+        _sceneRenderTarget = new RenderTarget2D(GraphicsDevice,
+            GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height,
+            false, SurfaceFormat.Color, DepthFormat.Depth24, 0, RenderTargetUsage.DiscardContents);
+
+        _postProcessEffect = Content.Load<Effect>(ContentFolderEffects + "TextureMerge");
+
+        _overlayTexture = Content.Load<Texture2D>(ContentFolderTextures + "blood_splash");
+        _postProcessEffect.Parameters["overlayTexture"]?.SetValue(_overlayTexture);
+        #endregion
+
+        // Vista inicial del menu
+        _menuCameraPosition = _player.Position + new Vector3(0, 15f, 250f);
+        _menuCameraTarget = _player.Position + new Vector3(0, 20f, 0f);
+
+        // Musica del juego
+        _menuMusic = Content.Load<Song>(ContentFolderMusic + "menu_terror_music");
+        _gameMusic = Content.Load<Song>(ContentFolderMusic + "ambience");
+        // Efectos de sonido
+        _carDoorOpen = Content.Load<SoundEffect>(ContentFolderSounds + "car_door_open");
+        _carDoorClose = Content.Load<SoundEffect>(ContentFolderSounds + "car_door_close");
+        _terrorScream = Content.Load<SoundEffect>(ContentFolderSounds + "terror_scream");
+
+        // Se configura para que este en loop constante
+        MediaPlayer.IsRepeating = true;
+        // Arranca con la musica del menu apenas se ejecuta
+        MediaPlayer.Play(_menuMusic);
+
+        // Pantallas Victory - GameOver
+        _victoryScreen.Initialize(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+        _gameOverScreen.Initialize(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
 
         base.LoadContent();   
     }
@@ -134,13 +233,146 @@ public class TGCGame : Game
     /// </summary>
     protected override void Update(GameTime gameTime)
     {
-        if (Keyboard.GetState().IsKeyDown(Keys.Escape))
+        var keyboardState = Keyboard.GetState();
+
+        if (keyboardState.IsKeyDown(Keys.Escape))
             Exit();
 
-        _player.Update(gameTime);
-        _enemy.Update(gameTime, _player.Position);
-        _view = _player.View;
+        // Me tiene harto la musica
+        if (keyboardState.IsKeyDown(Keys.M) && _previousKeyboardState.IsKeyUp(Keys.M))
+        {
+            MediaPlayer.IsMuted = !MediaPlayer.IsMuted;
+        }
 
+        switch (_gameState)
+        {
+            case GameState.Menu:
+                // Habilito el mouse para el menu
+                IsMouseVisible = true;
+
+                var action = _menuScreen.Update();
+                if (action == MenuAction.Play)
+                {
+                    _gameState = GameState.Transitioning;
+                    MediaPlayer.Stop();
+
+                    // Sonido de puerta de auto abriendose
+                    _carDoorOpen.Play();
+                    _hasPlayedDoorClose = false;
+                }
+                else if (action == MenuAction.Exit)
+                {
+                    Exit();
+                }
+
+                // Camara estatica mirando a la puerta de entrada
+                _view = Matrix.CreateLookAt(_menuCameraPosition, _menuCameraTarget, Vector3.Up);
+                break;
+
+            case GameState.Transitioning:
+                // Deshabilito el mouse nuevamente
+                IsMouseVisible = false;
+                // Dura 2 segundos la transicion
+                _transitionProgress += (float)gameTime.ElapsedGameTime.TotalSeconds / 2.0f;
+
+                // 70% de la transicion
+                if (_transitionProgress >= 0.7f && !_hasPlayedDoorClose)
+                {
+                    _carDoorClose.Play();
+                    _hasPlayedDoorClose = true; // Para que no vuelva a sonar nuevamente
+                }
+
+                // 100% de la transicion
+                if (_transitionProgress >= 1f)
+                {
+                    _transitionProgress = 1f;
+                    _gameState = GameState.Playing;
+                    MediaPlayer.Play(_gameMusic);
+                }
+
+                // Posicion de la camara del jugador y hacia donde esta mirando
+                Matrix playerRotation = Matrix.CreateFromYawPitchRoll(_player.Rotation, 0f, 0f);
+                Vector3 playerTarget = _player.Position + Vector3.Transform(Vector3.Forward, playerRotation);
+
+                // MathHelper.SmoothStep hace que el vuelo arranque suave, acelere y frene suavemente al llegar
+                Vector3 currentPos = Vector3.Lerp(_menuCameraPosition, _player.Position, MathHelper.SmoothStep(0, 1, _transitionProgress));
+                Vector3 currentTarget = Vector3.Lerp(_menuCameraTarget, playerTarget, MathHelper.SmoothStep(0, 1, _transitionProgress));
+
+                _view = Matrix.CreateLookAt(currentPos, currentTarget, Vector3.Up);
+                break;
+
+            case GameState.Playing:
+                if (!_isGameOver)
+                {
+                    _gameTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+                }
+
+                if (_player.HasWon)
+                {
+                    // Restamos los 5 minutos (300) menos el tiempo sobrante para saber cuánto tardó
+                    _timeTaken = 300f - _gameTimer;
+                    _gameState = GameState.Victory;
+                    MediaPlayer.Stop(); // Paramos la música de tensión
+                    // Opcional: _victorySound.Play(); si tuvieras un sonido
+                }
+
+                // Calculo que cad un minuto se escuche un grito
+                _screamTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+                if (_screamTimer <= 0f)
+                {
+                    // Reinicio el temporizador de grito
+                    _screamTimer = 60f;
+                    
+                    SoundEffectInstance screamInstance = _terrorScream.CreateInstance();
+                    // Disminuyo el volumen para que parezca mas lejano
+                    screamInstance.Volume = 0.2f;
+                    // Paneo del sonido de forma aleatoria para que parezca que viene de algun lugar del nivel
+                    // -1.0f (totalmente a la Izquierda) a 1.0f (totalmente a la Derecha)
+                    System.Random rnd = new System.Random();
+                    screamInstance.Pan = (float)(rnd.NextDouble() * 2.0 - 1.0);
+                    screamInstance.Play();
+                }
+
+                #region Girar modelos flotando en el aire
+                for (int i = 0; i < _models.Count; i++)
+                {
+                    if (_models[i].Name.Contains("PSX_Item_Shotgun") || _models[i].Name.Contains("PSX_Item_Key"))
+                    {
+                        var modelTuple = _models[i];
+
+                        Vector3 position = modelTuple.World.Translation;
+                        modelTuple.World.Translation = Vector3.Zero;
+                        modelTuple.World *= Matrix.CreateRotationY(2f * (float)gameTime.ElapsedGameTime.TotalSeconds);
+                        modelTuple.World.Translation = position;
+                        _models[i] = modelTuple;
+                    }
+                }
+                #endregion
+
+                _player.Update(gameTime, _models);
+                _enemy.Update(gameTime, _player.Position, _player.IsHidden);
+                _view = _player.View;
+                break;
+
+            case GameState.GameOver:
+                IsMouseVisible = true;
+                if (_gameOverScreen.Update() == MenuAction.MainMenu)
+                {
+                    ResetGame();
+                }
+                break;
+
+            case GameState.Victory:
+                IsMouseVisible = true;
+                if (_victoryScreen.Update() == MenuAction.MainMenu)
+                {
+                    ResetGame();
+                }
+                break;
+        }
+
+        _previousKeyboardState = keyboardState;
         base.Update(gameTime);
     }
 
@@ -150,7 +382,39 @@ public class TGCGame : Game
     /// </summary>
     protected override void Draw(GameTime gameTime)
     {
+        #region Pass 1 - Post-Processing
+        bool applyBloodEffect = _enemy.State == EnemyState.Cooldown;
+
+        if (applyBloodEffect)
+        {
+            GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+            GraphicsDevice.SetRenderTarget(_sceneRenderTarget);
+        }
+        else
+        {
+            GraphicsDevice.SetRenderTarget(null);
+        }
+        #endregion
+
         GraphicsDevice.Clear(Color.White);
+
+        #region Skybox
+        // Configuración para el Skybox
+        var originalRasterizerState = GraphicsDevice.RasterizerState;
+        var rasterizerState = new RasterizerState();
+        rasterizerState.CullMode = CullMode.None;
+        GraphicsDevice.RasterizerState = rasterizerState;
+
+        // Dibujado de skybox
+        // Uso el shader de Skybox
+        Matrix viewSkyBox = _view;
+        viewSkyBox.Translation = Vector3.Zero; // Esto fija el skybox al centro de la camara
+        _skyBox.Draw(viewSkyBox, _projection, Vector3.Zero);
+
+        // Restauro el estado de Rasterizer
+        GraphicsDevice.RasterizerState = originalRasterizerState;
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+        #endregion
 
         // Ya no se fija en VertexBuffer y IndexBuffer sino en la cantidad de habitaciones que existan
         if (_effect == null || _rooms.Count == 0)
@@ -201,16 +465,27 @@ public class TGCGame : Game
                 pass.Apply();
                 GraphicsDevice.DrawIndexedPrimitives(
                     PrimitiveType.TriangleList,
-                    0,
-                    0,
+                    0, 
+                    0, 
                     room.PrimitiveCount // Utilizo las primitivas guardadas LoadContent para dibujar las habitaciones
                 );
             }
         }
 
+        HallwayGeneratorHelper.DrawHallways(GraphicsDevice, _hallwayEffect, _view, _projection);
+
         // Dibujado de modelos en habitaciones
-        foreach (var (model, world, name) in _models)
+        for (int i = 0; i < _models.Count; i++)
         {
+            var (model, world, name) = _models[i];
+
+            // Si este es el objeto que el jugador esta mirando de cerca, se le dibuja el borde
+            if (_player.InteractableModelIndex == i)
+            {
+                DrawModelOutline(model, world, name);
+            }
+
+            // Dibujo normal
             DrawModelWithCustomEffect(model, world, name);
         }
 
@@ -225,6 +500,170 @@ public class TGCGame : Game
 
         // Dibujado de enemigo
         _enemy.Draw(_view, _projection);
+
+        #region Pass 2 - Post-Processing
+        if (applyBloodEffect)
+        {
+            GraphicsDevice.DepthStencilState = DepthStencilState.None;
+            GraphicsDevice.SetRenderTarget(null);
+
+            _postProcessEffect.Parameters["baseTexture"]?.SetValue(_sceneRenderTarget);
+            _postProcessEffect.Parameters["time"]?.SetValue((float)gameTime.TotalGameTime.TotalSeconds);
+            _postProcessEffect.Parameters["intensity"]?.SetValue(_enemy.CooldownIntensity);
+
+            _fullScreenQuad.Draw(_postProcessEffect);
+        }
+        #endregion
+
+        #region HUD
+
+        _spriteBatch.Begin();
+
+        // Valido que este jugando antes de dibujar el HUD
+        if (_gameState == GameState.Menu)
+        {
+            // Dibujado de botones del menu
+            _menuScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture);
+        }
+        else if (_gameState == GameState.GameOver)
+        {
+            _gameOverScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice);
+        }
+        else if (_gameState == GameState.Victory)
+        {
+            _victoryScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice, _timeTaken);
+        }
+        else if (_gameState == GameState.Playing)
+        {
+            #region Timer
+            int minutes = (int)_gameTimer / 60;
+            int seconds = (int)_gameTimer % 60;
+            string timeText = $"{minutes:D2}:{seconds:D2}";
+
+            // Cuanto mide el texto para poder centrarlo en la pantalla
+            Vector2 textSize = _spriteFont.MeasureString(timeText);
+            Vector2 textPosition = new Vector2((GraphicsDevice.Viewport.Width - textSize.X) / 2f, 20f);
+
+            // Sombra en texto para que se note un poco mas
+            _spriteBatch.DrawString(_spriteFont, timeText, textPosition + new Vector2(2, 2), Color.Black);
+            // Dibujamos el texto blanco real, si queda 30 segundos o menos cambio el valor a rojo
+            _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White);
+            #endregion
+
+            #region Texto de Objetivo
+            
+            string objectiveText = string.Empty;
+            float textScale = 0.55f;
+            // Evaluamos si el jugador ya tiene las 3 llaves para cambiar el texto
+            if (_player.CollectedKeys < 3)
+            {
+                textScale = 0.55f;
+                objectiveText = "Busca y recolecta todas las llaves en la mansión";
+            }
+            else
+            {
+                textScale = 0.45f;
+                objectiveText = "Busca tu premio en la habitación del fondo de la mansión";
+            }
+
+            // Ubicado arriba a la izquierda
+            Vector2 objectivePosition = new Vector2(20f, 20f);
+
+            // Sombra del texto
+            _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition + new Vector2(2, 2),
+                                    Color.Black, 0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
+
+            // Texto objetivo
+            _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition,
+                                    Color.White, 0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
+            #endregion
+
+            #region Barra de durabilidad de luces
+            if (_player.IsLightActive)
+            {
+                float percentage = _player.CurrentLightDurabilityPercentage;
+
+                int barWidth = 400;
+                int barHeight = 20;
+
+                // Centrado horizontalmente y en la parte inferior de la pantalla
+                int xPos = (GraphicsDevice.Viewport.Width - barWidth) / 2;
+                int yPos = GraphicsDevice.Viewport.Height - 60;
+
+                // Fondo gris oscuro para la barra
+                _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, barWidth, barHeight), Color.DarkGray);
+
+                // Con el valor del porcentajo voy actualizando el valor lleno de la barra
+                int fillWidth = (int)(barWidth * percentage);
+                // Blanco para el valor del porcentaje restante
+                _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
+            }
+            #endregion
+
+            #region Llaves Recolectadas
+            // Texto arriba a la derecha HUD
+            string keysText = "Llaves: ";
+
+            Vector2 keysPosition = new Vector2(GraphicsDevice.Viewport.Width - 250f, 25f);
+
+            _spriteBatch.DrawString(_spriteFont, keysText, keysPosition + new Vector2(2, 2), Color.Black);
+            _spriteBatch.DrawString(_spriteFont, keysText, keysPosition, Color.White);
+            #endregion
+        }
+
+        _spriteBatch.End();
+
+        // Restauro DepthStencilState tras usar SpriteBatch
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+
+        #region Dibujo los modelos de las llaves
+        if (_gameState == GameState.Playing)
+        {
+            // Limpio la profundidad asi se dibujan las llaves por arriba del resto de modelos
+            GraphicsDevice.Clear(ClearOptions.DepthBuffer, Color.Black, 1.0f, 0);
+
+            // Creamos una cámara ortográfica. (1 unidad de espacio = 1 píxel en pantalla)
+            Matrix uiProjection = Matrix.CreateOrthographicOffCenter(0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height, 0, 0.1f, 100f);
+            Matrix uiView = Matrix.CreateLookAt(new Vector3(0, 0, 10f), Vector3.Zero, Vector3.Up);
+
+            if (_modelCache.TryGetValue("Items/PSX_Item_Key", out var keyModel))
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    // Posicion de dibujo de las llaves
+                    float xPos = GraphicsDevice.Viewport.Width - 100f + (45f * i);
+                    float yPos = 60f; // Altura a la que se dibujan las llaves
+
+                    Matrix keyWorld = Matrix.CreateScale(1f) *                                                  // Tamaño del HUD
+                                      Matrix.CreateRotationZ(MathHelper.PiOver2) *                              // Rotado en Z para que el modelo se note mas
+                                      Matrix.CreateRotationY((float)gameTime.TotalGameTime.TotalSeconds * 2f) * // Se giran sobre Y para darle dinamismo al HUD
+                                      Matrix.CreateTranslation(xPos, yPos, 0f);
+
+                    // Por defecto tienen el color negro hasta que se recolecta alguna llave pintandolas de dorado
+                    Vector3 keyColor = i < _player.CollectedKeys ? Color.Gold.ToVector3() : Color.Black.ToVector3();
+
+                    // Dibujado de las llaves
+                    foreach (var mesh in keyModel.Meshes)
+                    {
+                        foreach (var part in mesh.MeshParts)
+                        {
+                            var fx = (Effect)part.Effect;
+                            fx.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * keyWorld);
+                            fx.Parameters["View"]?.SetValue(uiView);
+                            fx.Parameters["Projection"]?.SetValue(uiProjection);
+                            fx.Parameters["UseVertexColor"]?.SetValue(false);
+
+                            // Forzamos el color silueta negra o dorado
+                            fx.Parameters["DiffuseColor"]?.SetValue(keyColor);
+                        }
+                        mesh.Draw();
+                    }
+                }
+            }
+        }
+        #endregion
+
+        #endregion
 
         base.Draw(gameTime);
     }
@@ -248,6 +687,75 @@ public class TGCGame : Game
 
             mesh.Draw();
         }
+    }
+
+    private void DrawModelOutline(Model model, Matrix world, string name)
+    {
+        // Modifico Rasterizer para que solo dibuje las caras internas del modelo
+        GraphicsDevice.RasterizerState = new RasterizerState { CullMode = CullMode.CullClockwiseFace };
+        // Diferencio el escalado del modelo para que se note mas el borde para match box y lock
+        float outlineScale = name.Contains("Match_Box") || name.Contains("Lock") ? 1.20f : 1.03f;
+
+        Matrix outlineWorld = Matrix.CreateScale(outlineScale) * world;
+
+        foreach (var mesh in model.Meshes)
+        {
+            foreach (var part in mesh.MeshParts)
+            {
+                var effect = (Effect)part.Effect;
+
+                effect.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * outlineWorld);
+                effect.Parameters["View"]?.SetValue(_view);
+                effect.Parameters["Projection"]?.SetValue(_projection);
+                effect.Parameters["UseVertexColor"]?.SetValue(false);
+                // Yellow cuando tenga los shaders
+                effect.Parameters["DiffuseColor"]?.SetValue(Color.Azure.ToVector3());
+            }
+
+            mesh.Draw();
+        }
+
+        // Restauro el estado de Rasterizer para dibujar correctamente todo el resto
+        GraphicsDevice.RasterizerState = new RasterizerState { CullMode = CullMode.None };
+    }
+
+    private void LoadLevel()
+    {
+        // Limpiamos todo antes de volver a llenar
+        _models.Clear();
+        _rooms.Clear();
+        _trees.Clear();
+        _modelCache.Clear(); // Es importante limpiar el cache para forzar la recarga
+
+        // Delegamos TODA la generacion del nivel al Helper
+        LevelGeneratorHelper.GenerateLevel(
+            GraphicsDevice,
+            Content,
+            _effect,
+            _player.Position,
+            _modelCache,
+            _rooms,
+            _models,
+            _trees,
+            out _groundVertexBuffer,
+            out _groundIndexBuffer,
+            out _groundPrimitiveCount
+        );
+    }
+
+    private void ResetGame()
+    {
+        // Reiniciamos variables de juego
+        _gameTimer = 300f;
+        _isGameOver = false;
+        _transitionProgress = 0f;
+        _player.ResetStats();
+
+        // Llamamos a la carga del nivel
+        LoadLevel();
+
+        _gameState = GameState.Menu;
+        MediaPlayer.Play(_menuMusic);
     }
 
     /// <summary>

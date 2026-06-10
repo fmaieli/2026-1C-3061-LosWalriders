@@ -5,13 +5,14 @@ using TGC.MonoGame.TP.SourceCode.Enums;
 
 namespace TGC.MonoGame.TP.SourceCode.Screens
 {
-    public class GameOverScreen
+    public class VictoryScreen
     {
         private Rectangle _btnMainMenu;
         private MouseState _prevMouseState;
 
         public void Initialize(int screenWidth, int screenHeight)
         {
+            // Boton centrado debajo del texto
             _btnMainMenu = new Rectangle((screenWidth - 300) / 2, screenHeight / 2 + 100, 300, 60);
         }
 
@@ -31,28 +32,31 @@ namespace TGC.MonoGame.TP.SourceCode.Screens
             return action;
         }
 
-        public void Draw(SpriteBatch spriteBatch, SpriteFont font, Texture2D pixelTexture, GraphicsDevice graphicsDevice)
+        public void Draw(SpriteBatch spriteBatch, SpriteFont font, Texture2D pixelTexture, GraphicsDevice graphicsDevice, float timeTaken)
         {
-            // Fondo completamente negro
-            spriteBatch.Draw(pixelTexture, new Rectangle(0, 0, graphicsDevice.Viewport.Width, graphicsDevice.Viewport.Height), Color.Black);
+            // Fondo negro
+            spriteBatch.Draw(pixelTexture, new Rectangle(0, 0, graphicsDevice.Viewport.Width, graphicsDevice.Viewport.Height), Color.Black * 0.9f);
 
-            string titleText = "Game Over!";
-            string subText = "El monstruo te atrapo.";
+            // Textos
+            string victoryText = "Ganaste, conseguiste el premio!";
+            int minutes = (int)timeTaken / 60;
+            int seconds = (int)timeTaken % 60;
+            string timeText = $"Tiempo: {minutes:D2}:{seconds:D2}";
 
-            Vector2 titleSize = font.MeasureString(titleText);
-            Vector2 subSize = font.MeasureString(subText);
+            Vector2 victorySize = font.MeasureString(victoryText);
+            Vector2 timeSize = font.MeasureString(timeText);
             Vector2 centerScreen = new Vector2(graphicsDevice.Viewport.Width / 2f, graphicsDevice.Viewport.Height / 2f);
 
-            Vector2 titlePos = centerScreen - new Vector2(titleSize.X / 2f, titleSize.Y + 15f);
-            Vector2 subPos = centerScreen + new Vector2(-subSize.X / 2f, 15f);
+            Vector2 victoryPos = centerScreen - new Vector2(victorySize.X / 2f, victorySize.Y + 15f);
+            Vector2 timePos = centerScreen + new Vector2(-timeSize.X / 2f, 15f);
 
             // Sombras
-            spriteBatch.DrawString(font, titleText, titlePos + new Vector2(3, 3), Color.DarkRed);
-            spriteBatch.DrawString(font, subText, subPos + new Vector2(2, 2), Color.Black);
+            spriteBatch.DrawString(font, victoryText, victoryPos + new Vector2(3, 3), Color.DarkGoldenrod);
+            spriteBatch.DrawString(font, timeText, timePos + new Vector2(2, 2), Color.Black);
 
             // Texto principal
-            spriteBatch.DrawString(font, titleText, titlePos, Color.Red);
-            spriteBatch.DrawString(font, subText, subPos, Color.White);
+            spriteBatch.DrawString(font, victoryText, victoryPos, Color.Gold);
+            spriteBatch.DrawString(font, timeText, timePos, Color.White);
 
             // Boton de reinicio
             DrawButton(spriteBatch, font, pixelTexture, _btnMainMenu, "Volver al Inicio", Mouse.GetState());

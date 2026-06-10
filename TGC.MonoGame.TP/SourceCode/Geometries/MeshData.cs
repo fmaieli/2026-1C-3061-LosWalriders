@@ -2,7 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using System.Collections.Generic;
 
-namespace TGC.MonoGame.TP.SourceCode.Entities
+namespace TGC.MonoGame.TP.SourceCode.Geometries
 {
     public class MeshData
     {

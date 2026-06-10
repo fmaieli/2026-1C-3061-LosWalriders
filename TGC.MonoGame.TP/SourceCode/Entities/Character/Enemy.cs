@@ -7,13 +7,14 @@ using System.Diagnostics;
 using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Helpers;
 
-namespace TGC.MonoGame.TP.SourceCode.Entities
+namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 {
     internal class Enemy
     {
         public Vector3 Position { get; set; }
-        public Vector3 Forward { get; private set; } = Vector3.Forward;
+        public Vector3 Forward { get; set; } = Vector3.Forward;
         public EnemyState State { get; private set; } = EnemyState.Roaming;
+        public float CooldownIntensity => State == EnemyState.Cooldown ? _cooldownTimer / _cooldownDuration : 0f;
 
         private float _roamSpeed = 80f;                         // Velocidad normal
         private float _chaseSpeed = 120f;                       // Velocidad persiguiendo al jugador
@@ -69,7 +70,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             }
         }
 
-        public void Update(GameTime gameTime, Vector3 playerPosition)
+        public void Update(GameTime gameTime, Vector3 playerPosition, bool isPlayerHidden)
         {
             float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
@@ -87,7 +88,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
 
                 case EnemyState.Roaming:
                     Roam(elapsedTime);
-                    if (CanSeePlayer(playerPosition))
+                    if (CanSeePlayer(playerPosition, isPlayerHidden))
                     {
                         State = EnemyState.Chasing;
                     }
@@ -98,9 +99,9 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
 
                     if (Vector3.Distance(Position, playerPosition) < _catchRadius)
                     {
-                        CatchPlayer();
+                        if (!isPlayerHidden) CatchPlayer();
                     }
-                    else if (!CanSeePlayer(playerPosition))
+                    else if (!CanSeePlayer(playerPosition, isPlayerHidden)) 
                     {
                         State = EnemyState.Roaming;
                     }
@@ -150,8 +151,10 @@ namespace TGC.MonoGame.TP.SourceCode.Entities
             return moved;   // En caso de haber colisionado entonces devuelve el valor por defecto que es false
         }        
 
-        private bool CanSeePlayer(Vector3 playerPos)
+        private bool CanSeePlayer(Vector3 playerPos, bool isPlayerHidden)
         {
+            if (isPlayerHidden) return false; // El enemigo no puede ver al jugador si esta escondido
+
             // Medir la distancia con el jugador
             Vector3 directionToPlayer = playerPos - Position;
             float distance = directionToPlayer.Length();        // Distancia hasta el jugador
