@@ -72,7 +72,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
         }
 
         public static void GenerateLevel(GraphicsDevice graphicsDevice, ContentManager content, Effect effect, Vector3 cameraPosition,
-            Dictionary<string, Model> modelCache, List<(VertexBuffer, IndexBuffer, int, Matrix)> rooms,
+            Dictionary<string, Model> modelCache, List<(VertexBuffer, IndexBuffer, int, Matrix, RoomType)> rooms,
             List<(Model, Matrix, string)> models, List<(Model, Matrix, string)> trees, out VertexBuffer groundVertexBuffer, out IndexBuffer groundIndexBuffer,
             out int groundPrimitiveCount)
         {
@@ -337,7 +337,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
                     int primCount = mesh.Indices.Length / 3;
                     var roomWorld = Matrix.CreateTranslation(mergedWorldX, 0f, mergedWorldZ);
-                    rooms.Add((vertexBuffer, indexBuffer, primCount, roomWorld));
+                    rooms.Add((vertexBuffer, indexBuffer, primCount, roomWorld, roomData.Value.Type));
 
                     // Poner la puerta dependiendo del tipo de habitacion (se hace para poner la puerta particular para PrizeRoom)
                     string currentDoorPath = normalDoorPath;

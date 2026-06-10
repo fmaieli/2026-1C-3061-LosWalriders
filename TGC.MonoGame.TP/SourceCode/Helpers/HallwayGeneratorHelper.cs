@@ -12,6 +12,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 {
     public static class HallwayGeneratorHelper
     {
+        public static List<(VertexBuffer VertexBuffer, IndexBuffer IndexBuffer, int PrimitiveCount, Matrix World)> HallwayRooms { get; } = new();
         public static bool IsHallway(char c) => c == 'H' || c == 'V';
 
         private static WallOpening GetBoundary(int z, int x, HallwayDirection direction, string[] map, Dictionary<(int, int), List<HallwayDirection>> doorRegistry)
@@ -47,7 +48,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
 
         public static void GenerateHallways(string[] mapLayout, Dictionary<(int, int), List<HallwayDirection>> doorRegistry, GraphicsDevice graphicsDevice,
             ContentManager content,Effect effect, float startWorldX, float startWorldZ,float baseRoomWidth, float baseRoomDepth, float roomHeight, float roomGap, float cellSize,
-            List<(VertexBuffer, IndexBuffer, int, Matrix)> rooms, List<(Model, Matrix, string)> models, Dictionary<string, Model> modelCache, Random rng, List<BoundingBox> occupiedAreas)
+            List<(VertexBuffer, IndexBuffer, int, Matrix, RoomType)> rooms, List<(Model, Matrix, string)> models, Dictionary<string, Model> modelCache, Random rng, List<BoundingBox> occupiedAreas)
         {
             int rows = mapLayout.Length;
             int cols = mapLayout[0].Length;
@@ -152,7 +153,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     var indexBuffer = new IndexBuffer(graphicsDevice, IndexElementSize.SixteenBits, mesh.Indices.Length, BufferUsage.WriteOnly);
                     indexBuffer.SetData(mesh.Indices);
 
-                    rooms.Add((vertexBuffer, indexBuffer, mesh.Indices.Length / 3, Matrix.CreateTranslation(mergedWorldX, 0f, mergedWorldZ)));
+                    HallwayRooms.Add((vertexBuffer, indexBuffer, mesh.Indices.Length / 3, Matrix.CreateTranslation(mergedWorldX, 0f, mergedWorldZ)));
 
                     // Dibujo los modelos Miscellaneos dentro de los pasillos para llenarlos con algo
                     IRoomAssets roomTypeInstance = RoomFactory.Create(roomData.Value.Type);
@@ -173,6 +174,41 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                             models.Add((model, modelWorld, modelPath));
                         }
                     }
+                }
+            }
+        }
+
+        public static void DrawHallways(GraphicsDevice graphicsDevice, Effect effect, Matrix view, Matrix projection)
+        {
+            // WallTexture, FloorTexture, CeilingTexture, mas un canal extra
+            for (int i = 0; i < 4; i++)
+                graphicsDevice.SamplerStates[i] = SamplerState.LinearWrap; // Wrap de las texturas
+
+            effect.Parameters["View"]?.SetValue(view);
+            effect.Parameters["Projection"]?.SetValue(projection);
+
+            // Recorro los pasillos
+            foreach (var room in HallwayRooms)
+            {
+                // Vertices de cada habitacion (pasillo)
+                graphicsDevice.SetVertexBuffer(room.VertexBuffer);
+                // Indices de cada habitacion
+                graphicsDevice.Indices = room.IndexBuffer;
+
+                // Donde se debera de dibujar
+                effect.Parameters["World"]?.SetValue(room.World);
+
+                foreach (var pass in effect.CurrentTechnique.Passes)
+                {
+                    // Aplico la configuracion
+                    pass.Apply();
+                    // Dibujo
+                    graphicsDevice.DrawIndexedPrimitives(
+                        PrimitiveType.TriangleList,
+                        0,
+                        0,
+                        room.PrimitiveCount
+                    );
                 }
             }
         }

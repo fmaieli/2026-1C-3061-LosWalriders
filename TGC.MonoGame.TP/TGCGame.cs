@@ -34,8 +34,14 @@ public class TGCGame : Game
     private Matrix _projection;
 
     private Effect _effect;
+    private KeyboardState _previousKeyboardState;
 
-    private readonly List<(VertexBuffer VertexBuffer, IndexBuffer IndexBuffer, int PrimitiveCount, Matrix World)> _rooms = new();
+    private readonly List<(
+        VertexBuffer VertexBuffer,
+        IndexBuffer IndexBuffer, 
+        int PrimitiveCount, 
+        Matrix World, 
+        RoomType Type)> _rooms = new();
     private readonly Dictionary<string, Model> _modelCache = new();
     private readonly List<(Model Model, Matrix World, string Name)> _models = new();
 
@@ -47,6 +53,9 @@ public class TGCGame : Game
     private int _groundPrimitiveCount;
 
     private readonly List<(Model Model, Matrix World, string Name)> _trees = new();
+    private Effect _hallwayEffect;
+    private Texture2D _woodFloorTexture;
+    private Texture2D _concreteWallTexture;
 
     private float _gameTimer = 300f; // 5 Minutos (en segundos)
     private bool _isGameOver = false;
@@ -141,6 +150,15 @@ public class TGCGame : Game
         _pixelTexture = new Texture2D(GraphicsDevice, 1, 1);
         _pixelTexture.SetData(new[] { Color.White });
 
+        // Textures
+        _hallwayEffect = Content.Load<Effect>(ContentFolderEffects + "HallwayTextures");
+        _woodFloorTexture = Content.Load<Texture2D>(ContentFolderTextures + "old-wood-plank");
+        _concreteWallTexture = Content.Load<Texture2D>(ContentFolderTextures + "old-concrete-wall");
+
+        _hallwayEffect.Parameters["WallTexture"]?.SetValue(_concreteWallTexture);
+        _hallwayEffect.Parameters["FloorTexture"]?.SetValue(_woodFloorTexture);
+        _hallwayEffect.Parameters["Tiling"]?.SetValue(new Vector2(0.01f, 0.01f));
+
         // SpriteFont
         _spriteFont = Content.Load<SpriteFont>(ContentFolderSpriteFonts + "HUD");
 
@@ -215,8 +233,16 @@ public class TGCGame : Game
     /// </summary>
     protected override void Update(GameTime gameTime)
     {
-        if (Keyboard.GetState().IsKeyDown(Keys.Escape))
+        var keyboardState = Keyboard.GetState();
+
+        if (keyboardState.IsKeyDown(Keys.Escape))
             Exit();
+
+        // Me tiene harto la musica
+        if (keyboardState.IsKeyDown(Keys.M) && _previousKeyboardState.IsKeyUp(Keys.M))
+        {
+            MediaPlayer.IsMuted = !MediaPlayer.IsMuted;
+        }
 
         switch (_gameState)
         {
@@ -346,6 +372,7 @@ public class TGCGame : Game
                 break;
         }
 
+        _previousKeyboardState = keyboardState;
         base.Update(gameTime);
     }
 
@@ -438,12 +465,14 @@ public class TGCGame : Game
                 pass.Apply();
                 GraphicsDevice.DrawIndexedPrimitives(
                     PrimitiveType.TriangleList,
-                    0,
-                    0,
+                    0, 
+                    0, 
                     room.PrimitiveCount // Utilizo las primitivas guardadas LoadContent para dibujar las habitaciones
                 );
             }
         }
+
+        HallwayGeneratorHelper.DrawHallways(GraphicsDevice, _hallwayEffect, _view, _projection);
 
         // Dibujado de modelos en habitaciones
         for (int i = 0; i < _models.Count; i++)
