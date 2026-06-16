@@ -33,7 +33,9 @@ public class TGCGame : Game
     private Matrix _world;
     private Matrix _projection;
 
-    private Effect _effect;
+    private Effect _effect;         // BasicShader (habitaciones y suelo)
+    private Effect _modelsEffect;   // ModelsTexturesShader (modelos)
+
     private KeyboardState _previousKeyboardState;
 
     private readonly List<(
@@ -60,6 +62,11 @@ public class TGCGame : Game
     private float _gameTimer = 300f; // 5 Minutos (en segundos)
     private bool _isGameOver = false;
     private float _timeTaken = 0f;
+
+    // FPS
+    private int _frameCount = 0;
+    private float _timeSinceLastUpdate = 0f;
+    private int _currentFps = 0;
 
     // Menu - Victory - GameOver
     private GameState _gameState = GameState.Menu;
@@ -168,14 +175,15 @@ public class TGCGame : Game
 
         var skyBoxEffect = Content.Load<Effect>(ContentFolderEffects + "SkyBox");
         _skyBox = new SkyBox(skyBoxModel, skyBoxTexture, skyBoxEffect, 3000f);
-        
+
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
+        _modelsEffect = Content.Load<Effect>(ContentFolderEffects + "ModelsTexturesShader");
 
-        _player.LoadContent(Content, _effect);
+        _player.LoadContent(Content, _modelsEffect);
+        _enemy.LoadContent(Content, _modelsEffect);
 
-        _enemy.LoadContent(Content, _effect);
         // En un principio dibujo el enemigo cerca para comprobar que este funcionando correctamente
         // Revisar donde deberia de spawnear dentro del mapa
         _enemy.Position = _player.Position + new Vector3(0, 0, -500f);
@@ -233,6 +241,18 @@ public class TGCGame : Game
     /// </summary>
     protected override void Update(GameTime gameTime)
     {
+        #region conteo FPS
+        _timeSinceLastUpdate += (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+        // Paso 1 segundo
+        if (_timeSinceLastUpdate >= 1f)
+        {
+            _currentFps = _frameCount; // Guarda la cantidad de frames
+            _frameCount = 0;           // Reinicio el contador
+            _timeSinceLastUpdate -= 1f;// Resto el segundo que ya se proceso
+        }
+        #endregion
+
         var keyboardState = Keyboard.GetState();
 
         if (keyboardState.IsKeyDown(Keys.Escape))
@@ -382,6 +402,8 @@ public class TGCGame : Game
     /// </summary>
     protected override void Draw(GameTime gameTime)
     {
+        _frameCount++;
+
         #region Pass 1 - Post-Processing
         bool applyBloodEffect = _enemy.State == EnemyState.Cooldown;
 
@@ -422,9 +444,10 @@ public class TGCGame : Game
 
         GraphicsDevice.DepthStencilState = DepthStencilState.Default;
         GraphicsDevice.BlendState = BlendState.Opaque;
+        // Dibujado para las paredes y habitaciones
         GraphicsDevice.RasterizerState = new RasterizerState
         {
-            CullMode = CullMode.None,
+            CullMode = CullMode.CullClockwiseFace,
             //FillMode = FillMode.WireFrame
         };
 
@@ -473,6 +496,9 @@ public class TGCGame : Game
         }
 
         HallwayGeneratorHelper.DrawHallways(GraphicsDevice, _hallwayEffect, _view, _projection);
+
+        // Saco el RasterizerState para que dibuje todas las caras de los modelos
+        GraphicsDevice.RasterizerState = RasterizerState.CullNone;
 
         // Dibujado de modelos en habitaciones
         for (int i = 0; i < _models.Count; i++)
@@ -609,6 +635,17 @@ public class TGCGame : Game
             _spriteBatch.DrawString(_spriteFont, keysText, keysPosition + new Vector2(2, 2), Color.Black);
             _spriteBatch.DrawString(_spriteFont, keysText, keysPosition, Color.White);
             #endregion
+
+            #region FPS
+            string fpsText = $"FPS: {_currentFps}";
+            Vector2 fpsPosition = new Vector2(20f, GraphicsDevice.Viewport.Height - 50f);
+
+            // Sombra de text
+            _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition + new Vector2(2, 2), Color.Black);
+
+            // Dibujado del texto con validacion para que se ponga en rojo si baja de 30 FPS
+            _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition, _currentFps < 30 ? Color.Red : Color.Yellow);
+            #endregion
         }
 
         _spriteBatch.End();
@@ -731,7 +768,7 @@ public class TGCGame : Game
         LevelGeneratorHelper.GenerateLevel(
             GraphicsDevice,
             Content,
-            _effect,
+            _modelsEffect,
             _player.Position,
             _modelCache,
             _rooms,

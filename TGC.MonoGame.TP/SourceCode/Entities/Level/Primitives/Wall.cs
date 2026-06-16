@@ -96,11 +96,12 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
                 //0(A)------------------ - 1(B)
                 // Se realiza el calculo de los indices y se va agregando en la lista correspondiente
                 indices.Add((ushort)(start + 0));
+                indices.Add((ushort)(start + 2));
                 indices.Add((ushort)(start + 1));
-                indices.Add((ushort)(start + 2));
+
                 indices.Add((ushort)(start + 0));
-                indices.Add((ushort)(start + 2));
                 indices.Add((ushort)(start + 3));
+                indices.Add((ushort)(start + 2));
             }
 
             if (opening.Type == WallType.Solid)

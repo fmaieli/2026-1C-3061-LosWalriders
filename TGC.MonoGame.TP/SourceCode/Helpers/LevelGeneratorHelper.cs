@@ -1,10 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Content;
+using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
-using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives;
+using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Factories;
 using TGC.MonoGame.TP.SourceCode.Interfaces;
 
@@ -21,13 +21,22 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
         /// <summary>
         /// Reemplaza el material por defecto de los modelos con un material personalizado
         /// </summary>
-        public static void ApplyCustomEffectToModel(Model model, Effect effectTemplate)
+        public static void ApplyCustomEffectToModel(Model model, Effect customEffect)
         {
             foreach (var mesh in model.Meshes)
             {
                 foreach (var part in mesh.MeshParts)
                 {
-                    part.Effect = effectTemplate.Clone();
+                    // Busco la textura original del modelo
+                    Texture2D originalTexture = part.Effect.Parameters["Texture"]?.GetValueTexture2D();
+
+                    // Cargo la textura ModelsTexturesShader
+                    part.Effect = customEffect.Clone();
+
+                    if (originalTexture != null)
+                    {
+                        part.Effect.Parameters["MainTexture"]?.SetValue(originalTexture);
+                    }
                 }
             }
         }
@@ -79,6 +88,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             // Elimino las colisiones anteriores por precaucion
             WallColliders.Clear();
             ValidSpawnPoints.Clear();
+
+            // Shader para modelos con texturas
+            Effect modelsEffect = content.Load<Effect>(TGCGame.ContentFolderEffects + "ModelsTexturesShader");
 
             #region Carga de modelos
             // Puerta normal

@@ -50,16 +50,21 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
             }
 
             // Indices para Floor y Ceiling
-            ushort[] quad = { 0, 1, 2, 0, 2, 3 };
-            for (int face = 0; face < 2; face++)
+            ushort[] floorQuad = { 0, 2, 1, 0, 3, 2 };   // Piso Invertido
+            ushort[] ceilingQuad = { 0, 1, 2, 0, 2, 3 }; // Techo Normal
+
+            int facesToDraw = hasCeiling ? 2 : 1;
+            for (int face = 0; face < facesToDraw; face++)
             {
                 ushort baseV = (ushort)(face * 4);
-                indices.Add((ushort)(baseV + quad[0]));
-                indices.Add((ushort)(baseV + quad[1]));
-                indices.Add((ushort)(baseV + quad[2]));
-                indices.Add((ushort)(baseV + quad[3]));
-                indices.Add((ushort)(baseV + quad[4]));
-                indices.Add((ushort)(baseV + quad[5]));
+                ushort[] currentQuad = (face == 0) ? floorQuad : ceilingQuad;
+
+                indices.Add((ushort)(baseV + currentQuad[0]));
+                indices.Add((ushort)(baseV + currentQuad[1]));
+                indices.Add((ushort)(baseV + currentQuad[2]));
+                indices.Add((ushort)(baseV + currentQuad[3]));
+                indices.Add((ushort)(baseV + currentQuad[4]));
+                indices.Add((ushort)(baseV + currentQuad[5]));
             }
 
             // FrontWall

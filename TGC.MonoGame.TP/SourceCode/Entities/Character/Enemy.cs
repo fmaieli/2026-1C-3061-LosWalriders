@@ -37,13 +37,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             _model = content.Load<Model>("Models/Enemy/Enemy_Barney");
             _effect = baseEffect;
 
-            foreach (var mesh in _model.Meshes)
-            {
-                foreach (var part in mesh.MeshParts)
-                {
-                    part.Effect = _effect.Clone();
-                }
-            }
+            LevelGeneratorHelper.ApplyCustomEffectToModel(_model, _effect);
         }
 
         public void Draw(Matrix view, Matrix projection)
@@ -62,8 +56,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                     fx.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * world);
                     fx.Parameters["View"]?.SetValue(view);
                     fx.Parameters["Projection"]?.SetValue(projection);
-                    fx.Parameters["UseVertexColor"]?.SetValue(false);                    
-                    fx.Parameters["DiffuseColor"]?.SetValue(Color.DarkRed.ToVector3());
+                    fx.Parameters["DiffuseColor"]?.SetValue(Color.White.ToVector3());
                 }
 
                 mesh.Draw();

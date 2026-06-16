@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using TGC.MonoGame.TP.SourceCode.Components;
+using TGC.MonoGame.TP.SourceCode.Helpers;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 {
@@ -53,15 +54,10 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
         public void LoadContent(ContentManager content, Effect effect)
         {
-            _armsEffect = content.Load<Effect>("Effects/ArmsShader");
             _armsModel = content.Load<Model>("Models/Player/PSX_Player_Arms");
             _keyPickupSound = content.Load<SoundEffect>("Sounds/keys");
 
-            foreach (var mesh in _armsModel.Meshes)
-            {
-                foreach (var part in mesh.MeshParts)
-                    part.Effect = _armsEffect.Clone();
-            }
+            LevelGeneratorHelper.ApplyCustomEffectToModel(_armsModel, effect);
 
             nokiaLight = new NokiaLight();
             matchLight = new MatchLight();
@@ -71,13 +67,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 
             // Cargo el modelo del candado abierto
             _lockOpenModel = content.Load<Model>("Models/Items/PSX_Item_Lock_Open");
-            foreach (var mesh in _lockOpenModel.Meshes)
-            {
-                foreach (var part in mesh.MeshParts)
-                {
-                    part.Effect = effect.Clone();
-                }
-            }
+            LevelGeneratorHelper.ApplyCustomEffectToModel(_lockOpenModel, effect);
         }
 
         public void DrawArms(Matrix view, Matrix projection, GraphicsDevice graphicsDevice)
@@ -109,11 +99,16 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                 foreach (var part in mesh.MeshParts)
                 {
                     var fx = (Effect)part.Effect;
-                    fx.CurrentTechnique = fx.Techniques["BasicColorDrawing"];
+
+                    // ---> SOLUCIÓN: Eliminamos la línea fx.CurrentTechnique = ...
+                    // El nuevo shader usa "TexturedDrawing" y MonoGame lo detectará automáticamente.
+
                     fx.Parameters["World"]?.SetValue(bones[mesh.ParentBone.Index] * world);
                     fx.Parameters["View"]?.SetValue(view);
                     fx.Parameters["Projection"]?.SetValue(projection);
-                    fx.Parameters["DiffuseColor"]?.SetValue(Color.Magenta.ToVector3());
+
+                    // ---> SOLUCIÓN: Quitamos el Color.Magenta y ponemos White para ver la textura real
+                    fx.Parameters["DiffuseColor"]?.SetValue(Color.White.ToVector3());
                 }
 
                 mesh.Draw();
