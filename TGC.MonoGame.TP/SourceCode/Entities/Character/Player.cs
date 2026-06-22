@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Linq;
 using TGC.MonoGame.TP.SourceCode.Components;
 using TGC.MonoGame.TP.SourceCode.Helpers;
+using TGC.MonoGame.TP.SourceCode.Helpers.Managers;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 {
@@ -100,15 +101,13 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                 {
                     var fx = (Effect)part.Effect;
 
-                    // ---> SOLUCIÓN: Eliminamos la línea fx.CurrentTechnique = ...
-                    // El nuevo shader usa "TexturedDrawing" y MonoGame lo detectará automáticamente.
-
                     fx.Parameters["World"]?.SetValue(bones[mesh.ParentBone.Index] * world);
                     fx.Parameters["View"]?.SetValue(view);
                     fx.Parameters["Projection"]?.SetValue(projection);
 
-                    // ---> SOLUCIÓN: Quitamos el Color.Magenta y ponemos White para ver la textura real
                     fx.Parameters["DiffuseColor"]?.SetValue(Color.White.ToVector3());
+
+                    LightManager.ApplyLightingToShader(fx);
                 }
 
                 mesh.Draw();
@@ -158,6 +157,30 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             nokiaLight?.Update(elapsedTime);
             matchLight?.Update(elapsedTime);
 
+            // Vectores de direccion
+            Matrix cameraRotation = Matrix.CreateFromYawPitchRoll(Rotation, _cameraPitch, 0f);
+            Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
+            Vector3 right = Vector3.Transform(Vector3.Right, cameraRotation);
+
+            LightManager.IsLightActive = IsLightActive;
+
+            if (IsLightActive)
+            {
+                // Luz activa
+                var activeLight = (nokiaLight != null && nokiaLight.IsActive) ? nokiaLight : matchLight;
+
+                // Se actualiza LightManager con la posicion de los brazos y a donde mira la camara
+                LightManager.LightPosition = Position + new Vector3(0, 15f, 0); // Altura de linterna
+                LightManager.LightDirection = forward;                          // Hacia donde mira el jugador
+
+                // Ppropiedades del modelo de luz activa
+                LightManager.LightColor = activeLight.LightColor;
+                LightManager.LightIntensity = activeLight.LightIntensity;
+                LightManager.LightRadius = activeLight.LightRadius;
+                LightManager.IsSpotLight = activeLight.IsSpotLight;
+                LightManager.SpotAngle = activeLight.SpotAngle;
+            }
+
             // En FreeCamera la velocidad es el doble
             float moveSpeed = _freeCameraMode ? 600f : 300f;
             float turnSpeed = 3f;
@@ -188,12 +211,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             }
 
             // Limitamos el pitch para no dar una vuelta completa
-            _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
-
-            // Vectores de direccion
-            Matrix cameraRotation = Matrix.CreateFromYawPitchRoll(Rotation, _cameraPitch, 0f);
-            Vector3 forward = Vector3.Transform(Vector3.Forward, cameraRotation);
-            Vector3 right = Vector3.Transform(Vector3.Right, cameraRotation);
+            _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);            
 
             // Mirar hacia arriba y hacia abajo pero manteniendo la misma altura en el plano XZ
             forward.Y = 0f;

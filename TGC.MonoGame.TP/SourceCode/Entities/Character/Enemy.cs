@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Helpers;
+using TGC.MonoGame.TP.SourceCode.Helpers.Managers;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities.Character
 {
@@ -57,6 +58,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                     fx.Parameters["View"]?.SetValue(view);
                     fx.Parameters["Projection"]?.SetValue(projection);
                     fx.Parameters["DiffuseColor"]?.SetValue(Color.White.ToVector3());
+
+                    LightManager.ApplyLightingToShader(fx);
                 }
 
                 mesh.Draw();
