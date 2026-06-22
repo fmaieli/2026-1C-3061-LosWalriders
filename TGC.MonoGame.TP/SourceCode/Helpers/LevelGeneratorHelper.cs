@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives;
 using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Factories;
+using TGC.MonoGame.TP.SourceCode.Geometries;
 using TGC.MonoGame.TP.SourceCode.Interfaces;
 
 namespace TGC.MonoGame.TP.SourceCode.Helpers
@@ -341,7 +342,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                         hasCeiling: !isOutdoor
                     );
 
-                    var vertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionColor), mesh.Vertices.Length, BufferUsage.WriteOnly);
+                    var vertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionNormalColorTexture), mesh.Vertices.Length, BufferUsage.WriteOnly);
                     vertexBuffer.SetData(mesh.Vertices);
 
                     var indexBuffer = new IndexBuffer(graphicsDevice, IndexElementSize.SixteenBits, mesh.Indices.Length, BufferUsage.WriteOnly);

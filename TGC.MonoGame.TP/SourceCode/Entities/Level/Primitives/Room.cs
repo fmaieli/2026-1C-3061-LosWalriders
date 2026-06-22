@@ -29,10 +29,10 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
             WallOpening leftOpening, WallOpening rightOpening,
             bool hasCeiling = true)
         {
-            var vertices = new List<VertexPositionColor>();
+            var vertices = new List<VertexPositionNormalColorTexture>();
             var indices = new List<ushort>();
 
-            void Append(VertexPositionColor[] v, ushort[] i)
+            void Append(VertexPositionNormalColorTexture[] v, ushort[] i)
             {
                 ushort offset = (ushort)vertices.Count; // Desde que valor debe de arrancar para crear los triangulos
                 vertices.AddRange(v);

@@ -148,7 +148,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                         finalFront, finalBack, finalLeft, finalRight
                     );
 
-                    var vertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionColor), mesh.Vertices.Length, BufferUsage.WriteOnly);
+                    var vertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionNormalColorTexture), mesh.Vertices.Length, BufferUsage.WriteOnly);
                     vertexBuffer.SetData(mesh.Vertices);
                     var indexBuffer = new IndexBuffer(graphicsDevice, IndexElementSize.SixteenBits, mesh.Indices.Length, BufferUsage.WriteOnly);
                     indexBuffer.SetData(mesh.Indices);
