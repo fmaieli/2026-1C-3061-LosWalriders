@@ -57,7 +57,6 @@ public class TGCGame : Game
     private int _groundPrimitiveCount;
 
     private readonly List<(Model Model, Matrix World, string Name)> _trees = new();
-    private Effect _hallwayEffect;
     private Texture2D _woodFloorTexture;
     private Texture2D _concreteWallTexture;
 
@@ -86,6 +85,12 @@ public class TGCGame : Game
     private FullScreenQuad _fullScreenQuad;
     private Effect _postProcessEffect;
     private Texture2D _overlayTexture;
+    private float _grainIntensity = 0f;
+
+    private Effect _distortionEffect;
+    private RenderTarget2D _distortionRenderTarget;
+    private float _darknessTimer = 0f; // Sube de 0 a 3 segundos
+    private float _distortionFactor = 0f;
 
     // 2D - Skybox
     private Texture2D _pixelTexture;
@@ -159,15 +164,6 @@ public class TGCGame : Game
         _pixelTexture = new Texture2D(GraphicsDevice, 1, 1);
         _pixelTexture.SetData(new[] { Color.White });
 
-        // Textures
-        _hallwayEffect = Content.Load<Effect>(ContentFolderEffects + "HallwayTextures");
-        _woodFloorTexture = Content.Load<Texture2D>(ContentFolderTextures + "old-wood-plank");
-        _concreteWallTexture = Content.Load<Texture2D>(ContentFolderTextures + "old-concrete-wall");
-
-        _hallwayEffect.Parameters["WallTexture"]?.SetValue(_concreteWallTexture);
-        _hallwayEffect.Parameters["FloorTexture"]?.SetValue(_woodFloorTexture);
-        _hallwayEffect.Parameters["Tiling"]?.SetValue(new Vector2(0.01f, 0.01f));
-
         // SpriteFont
         _spriteFont = Content.Load<SpriteFont>(ContentFolderSpriteFonts + "HUD");
 
@@ -178,10 +174,26 @@ public class TGCGame : Game
         var skyBoxEffect = Content.Load<Effect>(ContentFolderEffects + "SkyBox");
         _skyBox = new SkyBox(skyBoxModel, skyBoxTexture, skyBoxEffect, 3000f);
 
+        // Efecto distorcion
+        _distortionEffect = Content.Load<Effect>(ContentFolderEffects + "ScreenDistortion");
+
+        _distortionRenderTarget = new RenderTarget2D(
+            GraphicsDevice,
+            GraphicsDevice.Viewport.Width, 
+            GraphicsDevice.Viewport.Height,
+            false, 
+            SurfaceFormat.Color, 
+            DepthFormat.None, 
+            0, 
+            RenderTargetUsage.DiscardContents
+        );
+
         // Cargo un efecto basico propio declarado en el Content pipeline.
         // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
         _effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
         _modelsEffect = Content.Load<Effect>(ContentFolderEffects + "ModelsTexturesShader");
+
+        RoomTextureManager.LoadTextures(Content);
 
         _player.LoadContent(Content, _modelsEffect);
         _enemy.LoadContent(Content, _modelsEffect);
@@ -374,6 +386,38 @@ public class TGCGame : Game
 
                 _player.Update(gameTime, _models);
                 _enemy.Update(gameTime, _player.Position, _player.IsHidden);
+
+                // Distancia de granulado filmico con respecto al enemigo
+                float distanceToEnemy = Vector3.Distance(_player.Position, _enemy.Position);
+                float grainRadius = 400f; // Misma distancia que radio de vision del enemigo
+
+                // Si no nos atrapo y no estamos escondidos en el ropero
+                if (_enemy.State != EnemyState.Cooldown && !_player.IsHidden && distanceToEnemy < grainRadius)
+                {
+                    // La intensidad aumenta de 0 a los 400, 1.0 si esta pegado a nosotros
+                    _grainIntensity = MathHelper.Clamp(1.0f - (distanceToEnemy / grainRadius), 0f, 1f);
+                }
+                else
+                {
+                    _grainIntensity = 0f;
+                }
+
+                #region Distorcion en pantalla por oscuridad
+                if (!_player.IsLightActive)
+                {
+                    // El blur va apareciendo progresivamente durante 3 segundos
+                    _darknessTimer = MathHelper.Clamp(_darknessTimer + (float)gameTime.ElapsedGameTime.TotalSeconds, 0f, 3f);
+                }
+                else
+                {
+                    // El jugador logra encender una luz, la vista se despeja el doble de rapido
+                    _darknessTimer = MathHelper.Clamp(_darknessTimer - (float)gameTime.ElapsedGameTime.TotalSeconds * 2f, 0f, 3f);
+                }
+
+                // Factor de 0f a 1f para que el shader lo entienda
+                _distortionFactor = _darknessTimer / 3.0f;
+                #endregion
+
                 _view = _player.View;
                 break;
 
@@ -408,8 +452,13 @@ public class TGCGame : Game
 
         #region Pass 1 - Post-Processing
         bool applyBloodEffect = _enemy.State == EnemyState.Cooldown;
+        bool applyGrainEffect = _grainIntensity > 0f;
+        bool applyDistortionEffect = _distortionFactor > 0f;
 
-        if (applyBloodEffect)
+        // Se activa el render para cualquiera de los efectos posibles
+        bool usePostProcessing = applyBloodEffect || applyGrainEffect || applyDistortionEffect;
+
+        if (usePostProcessing)
         {
             GraphicsDevice.DepthStencilState = DepthStencilState.Default;
             GraphicsDevice.SetRenderTarget(_sceneRenderTarget);
@@ -462,13 +511,24 @@ public class TGCGame : Game
 
         LightManager.ApplyLightingToShader(_effect);
 
+        // Tiling en BasicShader para que pueda dibujar correctamente las texturas
+        GraphicsDevice.SamplerStates[0] = SamplerState.PointWrap;
+        GraphicsDevice.SamplerStates[1] = SamplerState.PointWrap;
+
+        if (RoomTextureManager.RoomTextures.TryGetValue(RoomType.Outdoor, out var outdoorTex))
+        {
+            _effect.Parameters["FloorTexture"]?.SetValue(outdoorTex.Floor);
+            _effect.Parameters["WallTexture"]?.SetValue(outdoorTex.Wall);
+        }
+
         // Suelo
         if (_groundVertexBuffer != null && _groundIndexBuffer != null)
         {
+            GraphicsDevice.RasterizerState = RasterizerState.CullNone;
             GraphicsDevice.SetVertexBuffer(_groundVertexBuffer);
             GraphicsDevice.Indices = _groundIndexBuffer;
             // Por bleeding entre habitaciones y suelo
-            _effect.Parameters["World"]?.SetValue(Matrix.CreateTranslation(0f, -1f, 0f));
+            _effect.Parameters["World"]?.SetValue(Matrix.CreateTranslation(0f, -1f, -3500f));
 
             foreach (var pass in _effect.CurrentTechnique.Passes)
             {
@@ -483,25 +543,29 @@ public class TGCGame : Game
         }
 
         // Habitaciones
-        foreach (var room in _rooms)
+        foreach (var (vertexBuffer, indexBuffer, primitiveCount, worldMatrix, roomType) in _rooms)
         {
-            GraphicsDevice.SetVertexBuffer(room.VertexBuffer);
-            GraphicsDevice.Indices = room.IndexBuffer;
-            _effect.Parameters["World"]?.SetValue(room.World);
+            GraphicsDevice.SetVertexBuffer(vertexBuffer);
+            GraphicsDevice.Indices = indexBuffer;
+            _effect.Parameters["World"]?.SetValue(worldMatrix);
+
+            if (RoomTextureManager.RoomTextures.TryGetValue(roomType, out var textures))
+            {
+                _effect.Parameters["WallTexture"]?.SetValue(textures.Wall);
+                _effect.Parameters["FloorTexture"]?.SetValue(textures.Floor);
+            }
 
             foreach (var pass in _effect.CurrentTechnique.Passes)
             {
                 pass.Apply();
                 GraphicsDevice.DrawIndexedPrimitives(
-                    PrimitiveType.TriangleList,
+                    PrimitiveType.TriangleList, 
                     0, 
                     0, 
-                    room.PrimitiveCount // Utilizo las primitivas guardadas LoadContent para dibujar las habitaciones
+                    primitiveCount
                 );
             }
         }
-
-        HallwayGeneratorHelper.DrawHallways(GraphicsDevice, _hallwayEffect, _view, _projection);
 
         // Saco el RasterizerState para que dibuje todas las caras de los modelos
         GraphicsDevice.RasterizerState = RasterizerState.CullNone;
@@ -536,16 +600,32 @@ public class TGCGame : Game
         _enemy.Draw(_view, _projection);
 
         #region Pass 2 - Post-Processing
-        if (applyBloodEffect)
+        if (usePostProcessing)
         {
             GraphicsDevice.DepthStencilState = DepthStencilState.None;
-            GraphicsDevice.SetRenderTarget(null);
+            GraphicsDevice.SetRenderTarget(applyDistortionEffect ? _distortionRenderTarget : null);
 
             _postProcessEffect.Parameters["baseTexture"]?.SetValue(_sceneRenderTarget);
             _postProcessEffect.Parameters["time"]?.SetValue((float)gameTime.TotalGameTime.TotalSeconds);
-            _postProcessEffect.Parameters["intensity"]?.SetValue(_enemy.CooldownIntensity);
+            _postProcessEffect.Parameters["bloodIntensity"]?.SetValue(applyBloodEffect ? _enemy.CooldownIntensity : 0f);
+            _postProcessEffect.Parameters["grainIntensity"]?.SetValue(_grainIntensity);
 
             _fullScreenQuad.Draw(_postProcessEffect);
+
+            if (applyDistortionEffect)
+            {
+                GraphicsDevice.SetRenderTarget(null); 
+
+                _distortionEffect.Parameters["ScreenTexture"]?.SetValue(_distortionRenderTarget);
+                _distortionEffect.Parameters["Time"]?.SetValue((float)gameTime.TotalGameTime.TotalSeconds);
+                _distortionEffect.Parameters["BlurFactor"]?.SetValue(_distortionFactor);
+
+                _fullScreenQuad.Draw(_distortionEffect);
+
+                // Limpio ScreenTexture
+                _distortionEffect.Parameters["ScreenTexture"]?.SetValue((Texture2D)null);
+                GraphicsDevice.Textures[0] = null;
+            }
         }
         #endregion
 
