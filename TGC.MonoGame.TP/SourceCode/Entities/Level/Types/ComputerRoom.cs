@@ -9,6 +9,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Types
     internal class ComputerRoom : IRoomAssets
     {
         public RoomType Type { get; } = RoomType.Computer;
+        public string WallTexturePath => "Textures/rooms/wall/wall-computer";
+        public string FloorTexturePath => "Textures/rooms/floor/floor_computer";
 
         public List<string> Assets { get; } = new()
         {

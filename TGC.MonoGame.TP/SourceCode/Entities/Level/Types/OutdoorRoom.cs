@@ -9,6 +9,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Types
     internal class OutdoorRoom : IRoomAssets
     {
         public RoomType Type { get; } = RoomType.Outdoor;
+        public string WallTexturePath => "Textures/rooms/wall/wall-outdoor";
+        public string FloorTexturePath => "Textures/rooms/floor/floor_outdoor";
 
         public List<string> Assets { get; } = new()
         {

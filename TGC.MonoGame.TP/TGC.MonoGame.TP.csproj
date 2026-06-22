@@ -12,6 +12,11 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Content\Textures\rooms\walls\**" />
+    <EmbeddedResource Remove="Content\Textures\rooms\walls\**" />
+    <None Remove="Content\Textures\rooms\walls\**" />
+  </ItemGroup>
+  <ItemGroup>
     <None Remove="Icon.ico" />
     <None Remove="Icon.bmp" />
   </ItemGroup>
@@ -33,6 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Content\Models\World\" />
+    <Folder Include="Content\Textures\rooms\floor\" />
   </ItemGroup>
   <Target Name="RestoreDotnetTools" BeforeTargets="CollectPackageReferences">
     <Message Text="Restoring dotnet tools" Importance="High" />
