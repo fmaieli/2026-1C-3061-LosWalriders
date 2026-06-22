@@ -3,11 +3,13 @@ using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Media;
+using System;
 using System.Collections.Generic;
 using TGC.MonoGame.TP.SourceCode.Entities.Character;
 using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Geometries;
 using TGC.MonoGame.TP.SourceCode.Helpers;
+using TGC.MonoGame.TP.SourceCode.Helpers.Managers;
 using TGC.MonoGame.TP.SourceCode.Screens;
 
 namespace TGC.MonoGame.TP;
@@ -453,8 +455,12 @@ public class TGCGame : Game
 
         _effect.Parameters["View"]?.SetValue(_view);
         _effect.Parameters["Projection"]?.SetValue(_projection);
-        _effect.Parameters["UseVertexColor"]?.SetValue(true);
+        _effect.Parameters["UseVertexColor"]?.SetValue(1.0f);
         _effect.Parameters["DiffuseColor"]?.SetValue(Vector3.One);
+
+        _effect.Parameters["Tiling"]?.SetValue(new Vector2(3.0f, 3.0f));
+
+        LightManager.ApplyLightingToShader(_effect);
 
         // Suelo
         if (_groundVertexBuffer != null && _groundIndexBuffer != null)
@@ -499,6 +505,8 @@ public class TGCGame : Game
 
         // Saco el RasterizerState para que dibuje todas las caras de los modelos
         GraphicsDevice.RasterizerState = RasterizerState.CullNone;
+
+        LightManager.ApplyLightingToShader(_modelsEffect);
 
         // Dibujado de modelos en habitaciones
         for (int i = 0; i < _models.Count; i++)
@@ -688,10 +696,13 @@ public class TGCGame : Game
                             fx.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * keyWorld);
                             fx.Parameters["View"]?.SetValue(uiView);
                             fx.Parameters["Projection"]?.SetValue(uiProjection);
-                            fx.Parameters["UseVertexColor"]?.SetValue(false);
+                            fx.Parameters["UseVertexColor"]?.SetValue(0.0f);
 
-                            // Forzamos el color silueta negra o dorado
-                            fx.Parameters["DiffuseColor"]?.SetValue(keyColor);
+                            // Las llaves ignoran la linterna
+                            fx.Parameters["IsLightActive"]?.SetValue(0.0f);
+
+                            // Forzamos el color silueta negra o dorado y multiplicando x10 para el HUD
+                            fx.Parameters["DiffuseColor"]?.SetValue(keyColor * 10f);
                         }
                         mesh.Draw();
                     }
@@ -718,8 +729,10 @@ public class TGCGame : Game
                 effect.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * world);
                 effect.Parameters["View"]?.SetValue(_view);
                 effect.Parameters["Projection"]?.SetValue(_projection);
-                effect.Parameters["UseVertexColor"]?.SetValue(false);
+                effect.Parameters["UseVertexColor"]?.SetValue(0.0f);
                 effect.Parameters["DiffuseColor"]?.SetValue(tint);
+
+                LightManager.ApplyLightingToShader(effect);
             }
 
             mesh.Draw();
@@ -744,7 +757,7 @@ public class TGCGame : Game
                 effect.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * outlineWorld);
                 effect.Parameters["View"]?.SetValue(_view);
                 effect.Parameters["Projection"]?.SetValue(_projection);
-                effect.Parameters["UseVertexColor"]?.SetValue(false);
+                effect.Parameters["UseVertexColor"]?.SetValue(0.0f);
                 // Yellow cuando tenga los shaders
                 effect.Parameters["DiffuseColor"]?.SetValue(Color.Azure.ToVector3());
             }
