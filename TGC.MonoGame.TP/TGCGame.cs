@@ -800,6 +800,10 @@ public class TGCGame : Game
     {
         Vector3 tint = ModelTintHelper.GetTint(modelName).ToVector3();
 
+        // Modelos que no tengan color definido,
+        // sino dibuja por defecto en negro el modelo del auto
+        if (tint == Vector3.Zero) tint = Vector3.One;
+
         foreach (var mesh in model.Meshes)
         {
             foreach (var part in mesh.MeshParts)
@@ -809,7 +813,7 @@ public class TGCGame : Game
                 effect.Parameters["World"]?.SetValue(mesh.ParentBone.Transform * world);
                 effect.Parameters["View"]?.SetValue(_view);
                 effect.Parameters["Projection"]?.SetValue(_projection);
-                effect.Parameters["UseVertexColor"]?.SetValue(0.0f);
+                effect.Parameters["UseVertexColor"]?.SetValue(1.0f);
                 effect.Parameters["DiffuseColor"]?.SetValue(tint);
 
                 LightManager.ApplyLightingToShader(effect);
