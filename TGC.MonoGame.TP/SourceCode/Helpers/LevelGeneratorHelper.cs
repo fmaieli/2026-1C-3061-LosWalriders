@@ -1,11 +1,12 @@
 ﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Content;
+using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
-using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives;
+using TGC.MonoGame.TP.SourceCode.Enums;
 using TGC.MonoGame.TP.SourceCode.Factories;
+using TGC.MonoGame.TP.SourceCode.Geometries;
 using TGC.MonoGame.TP.SourceCode.Interfaces;
 
 namespace TGC.MonoGame.TP.SourceCode.Helpers
@@ -21,13 +22,22 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
         /// <summary>
         /// Reemplaza el material por defecto de los modelos con un material personalizado
         /// </summary>
-        public static void ApplyCustomEffectToModel(Model model, Effect effectTemplate)
+        public static void ApplyCustomEffectToModel(Model model, Effect customEffect)
         {
             foreach (var mesh in model.Meshes)
             {
                 foreach (var part in mesh.MeshParts)
                 {
-                    part.Effect = effectTemplate.Clone();
+                    // Busco la textura original del modelo
+                    Texture2D originalTexture = part.Effect.Parameters["Texture"]?.GetValueTexture2D();
+
+                    // Cargo la textura ModelsTexturesShader
+                    part.Effect = customEffect.Clone();
+
+                    if (originalTexture != null)
+                    {
+                        part.Effect.Parameters["MainTexture"]?.SetValue(originalTexture);
+                    }
                 }
             }
         }
@@ -79,6 +89,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             // Elimino las colisiones anteriores por precaucion
             WallColliders.Clear();
             ValidSpawnPoints.Clear();
+
+            // Shader para modelos con texturas
+            Effect modelsEffect = content.Load<Effect>(TGCGame.ContentFolderEffects + "ModelsTexturesShader");
 
             #region Carga de modelos
             // Puerta normal
@@ -329,7 +342,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                         hasCeiling: !isOutdoor
                     );
 
-                    var vertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionColor), mesh.Vertices.Length, BufferUsage.WriteOnly);
+                    var vertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionNormalColorTexture), mesh.Vertices.Length, BufferUsage.WriteOnly);
                     vertexBuffer.SetData(mesh.Vertices);
 
                     var indexBuffer = new IndexBuffer(graphicsDevice, IndexElementSize.SixteenBits, mesh.Indices.Length, BufferUsage.WriteOnly);
@@ -444,6 +457,29 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                 rooms, models, modelCache, rng, occupiedAreas
             );
 
+            // Colisiones modelos
+            foreach (var (_, world, name) in models)
+            {
+                Vector3 pos = world.Translation;
+                Vector3 basePos = new Vector3(pos.X, 0f, pos.Z);
+
+                // Y base = 0 y maximo Y igual 100f
+                if (name.Contains("PSX_Wooden_Drawers"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(15f, 0, 15f), basePos + new Vector3(15f, 100f, 15f)));
+                else if (name.Contains("PSX_Bed"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(20f, 0, 30f), basePos + new Vector3(20f, 100f, 30f)));
+                else if (name.Contains("PSX_TV_Stand"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(18f, 0, 10f), basePos + new Vector3(18f, 100f, 10f)));
+                else if (name.Contains("PSX_Armchair"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(15f, 0, 15f), basePos + new Vector3(15f, 100f, 15f)));
+                else if (name.Contains("PSX_Wooden_Table"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(20f, 0, 20f), basePos + new Vector3(20f, 100f, 20f)));
+                else if (name.Contains("PSX_Rusty_Barell"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(10f, 0, 10f), basePos + new Vector3(10f, 100f, 10f)));
+                else if (name.Contains("PSX_Wooden_Closet"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(20f, 0, 15f), basePos + new Vector3(20f, 100f, 15f)));
+            }
+
             // Cols y Rows es el length de mapLayout
             float gridWidth = cols * (baseRoomWidth * 2f + roomGap);
             float gridDepth = rows * (baseRoomDepth * 2f + roomGap);
@@ -495,8 +531,109 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     var world = Matrix.CreateScale(treeScale) * Matrix.CreateRotationY(rotY) * Matrix.CreateTranslation(x, -1f, z);
                     trees.Add((treeModel, world, "World/PSX_Low_Poly_Tree"));
                     placedTrees++;
-                }
+                }                
             }
+
+            #region Bloqueo de jugador en entrada
+            // Modelo auto
+            string carPath = "Car/PSX_Fiat1";
+            if (!modelCache.TryGetValue(carPath, out var carModel))
+            {
+                carModel = content.Load<Model>(TGCGame.ContentFolder3D + carPath);
+                ApplyCustomEffectToModel(carModel, modelsEffect);
+                modelCache[carPath] = carModel;
+            }
+
+            Vector3 carPosition = cameraPosition + new Vector3(15f, -51f, 350f);
+            Matrix carWorld = Matrix.CreateScale(0.4f) * Matrix.CreateRotationY(MathHelper.ToRadians(270f)) * Matrix.CreateTranslation(carPosition);
+            models.Add((carModel, carWorld, carPath));
+
+            // Modelos de fences
+            // Izquierda
+            string fenceLeftPath = "Level/Outdoor/PSX_Fence_White_Left_Closed";
+            if (!modelCache.TryGetValue(fenceLeftPath, out var fenceLeftModel))
+            {
+                fenceLeftModel = content.Load<Model>(TGCGame.ContentFolder3D + fenceLeftPath);
+                ApplyCustomEffectToModel(fenceLeftModel, modelsEffect);
+                modelCache[fenceLeftPath] = fenceLeftModel;
+            }
+
+            // Derecha
+            string fenceRightPath = "Level/Outdoor/PSX_Fence_White_Right_Closed";
+            if (!modelCache.TryGetValue(fenceRightPath, out var fenceRightModel))
+            {
+                fenceRightModel = content.Load<Model>(TGCGame.ContentFolder3D + fenceRightPath);
+                ApplyCustomEffectToModel(fenceRightModel, modelsEffect);
+                modelCache[fenceRightPath] = fenceRightModel;
+            }
+
+            float fenceWidth = 92f; // Evitar los huecos entre modelos al dibujarlos
+
+            // Lado izquierda de entrada
+            // Fence paralela al auto - eje X
+            Vector3 frontLeftPos = cameraPosition + new Vector3(-105f, -51f, 350f);
+            models.Add(
+                (fenceLeftModel, 
+                Matrix.CreateScale(0.4f) * Matrix.CreateRotationY(0f) * Matrix.CreateTranslation(frontLeftPos),
+                fenceLeftPath)
+            );
+
+            // Fences perpendiculares a pared - eje Z
+            // Para conectar exactamente la esquina
+            float leftCornerX = -105f - (fenceWidth / 2f); 
+            for (int i = 0; i < 2; i++)
+            {
+                Vector3 sideLeftPos = cameraPosition + new Vector3(leftCornerX, -51f, 350f - (fenceWidth / 2f) - (i * fenceWidth));
+                models.Add(
+                    (fenceLeftModel, 
+                    Matrix.CreateScale(0.4f) * Matrix.CreateRotationY(MathHelper.PiOver2) * Matrix.CreateTranslation(sideLeftPos), 
+                    fenceLeftPath)
+                );
+            }
+
+            // Lado derecho de entrada
+            // Fence paralela al auto - eje X
+            Vector3 frontRightPos = cameraPosition + new Vector3(135f, -51f, 350f);
+            models.Add(
+                (fenceRightModel, 
+                Matrix.CreateScale(0.4f) * Matrix.CreateRotationY(0f) * Matrix.CreateTranslation(frontRightPos), 
+                fenceRightPath)
+            );
+
+            // Fences perpendiculares a pared - eje Z
+            // Para conectar la esquina
+            float rightCornerX = 135f + (fenceWidth / 2f);
+
+            for (int i = 0; i < 2; i++)
+            {
+                Vector3 sideRightPos = cameraPosition + new Vector3(rightCornerX, -51f, 350f - (fenceWidth / 2f) - (i * fenceWidth));
+                models.Add(
+                    (fenceRightModel, 
+                    Matrix.CreateScale(0.4f) * Matrix.CreateRotationY(MathHelper.PiOver2) * Matrix.CreateTranslation(sideRightPos), 
+                    fenceRightPath)
+                );
+            }
+
+            // Colisiones
+            // Pared izquierda
+            WallColliders.Add(new BoundingBox(
+                new Vector3(cameraPosition.X + leftCornerX - 10f, 0f, cameraPosition.Z + 150f),
+                new Vector3(cameraPosition.X + leftCornerX + 10f, 150f, cameraPosition.Z + 360f)
+            ));
+
+            // Pared derecha
+            WallColliders.Add(new BoundingBox(
+                new Vector3(cameraPosition.X + rightCornerX - 10f, 0f, cameraPosition.Z + 150f),
+                new Vector3(cameraPosition.X + rightCornerX + 10f, 150f, cameraPosition.Z + 360f)
+            ));
+
+            // Pared trasera incluido el auto
+            WallColliders.Add(new BoundingBox(
+                new Vector3(cameraPosition.X + leftCornerX, 0f, cameraPosition.Z + 330f),
+                new Vector3(cameraPosition.X + rightCornerX, 150f, cameraPosition.Z + 370f)
+            ));
+
+            #endregion
         }
 
         private static void RegisterDoor(Dictionary<(int, int), List<HallwayDirection>> registry, int z, int x, HallwayDirection direction)

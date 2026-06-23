@@ -10,6 +10,10 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Types
     {
         public RoomType Type { get; } = RoomType.Bath;
 
+        // Placeholder - uso texturas de kitchen como default
+        public string WallTexturePath => "Textures/rooms/wall/wall-kitchen";
+        public string FloorTexturePath => "Textures/rooms/floor/floor_kitchen";
+
         public List<string> Assets { get; } = new()
         {
             "Level/Bathroom/PSX_Toilet_Paper",

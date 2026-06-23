@@ -14,6 +14,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
                 origin: new Vector3(-width, 0, depth),
                 right: Vector3.UnitX, // Ir hacia la derecha en el X positivo desde el origen
                 up: Vector3.UnitY,    // Ir hacia arriba en el Y positivo desde el origen
+                normal: -Vector3.UnitZ,
                 wallWidth: width * 2,
                 wallHeight: height,
                 color: color,
@@ -27,6 +28,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
                 origin: new Vector3(width, 0, -depth),
                 right: -Vector3.UnitX, // Ir hacia la izquierda en el X negativo seria la derecha desde el origen
                 up: Vector3.UnitY,
+                normal: Vector3.UnitZ,
                 wallWidth: width * 2,
                 wallHeight: height,
                 color: color,
@@ -40,6 +42,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
                 origin: new Vector3(-width, 0, -depth),
                 right: Vector3.UnitZ, // Ir hacia adelante en el eje Z (positivo) seria la derecha de la pared
                 up: Vector3.UnitY,
+                normal: Vector3.UnitX,
                 wallWidth: depth * 2,
                 wallHeight: height,
                 color: color,
@@ -53,6 +56,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
                 origin: new Vector3(width, 0, depth),
                 right: -Vector3.UnitZ, // Ir hacia atras en el eje Z (negativo) seria la derecha de la pared
                 up: Vector3.UnitY,
+                normal: -Vector3.UnitX,
                 wallWidth: depth * 2,
                 wallHeight: height,
                 color: color,
@@ -64,22 +68,31 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
             Vector3 origin,
             Vector3 right,
             Vector3 up,
+            Vector3 normal,
             float wallWidth,
             float wallHeight,
             Color color,
             WallOpening opening)
         {
-            var vertices = new List<VertexPositionColor>();
+            var vertices = new List<VertexPositionNormalColorTexture>();
             var indices = new List<ushort>();
             var centers = new List<Vector3>();
+
+            // Calculado para las texturas y se repitan correctamente
+            Vector2 GetUV(Vector3 pos)
+            {
+                float u = Vector3.Dot(pos - origin, right) / 50f;
+                float v = Vector3.Dot((origin + up * wallHeight) - pos, up) / 50f;
+                return new Vector2(u, v);
+            }
 
             void AddQuad(Vector3 bottomLeft, Vector3 bottomRight, Vector3 upperRight, Vector3 upperLeft) // Creacion de rectangulos (2 triangulos)
             {
                 ushort start = (ushort)vertices.Count; // Desde que valor debe de arrancar para crear los triangulos
-                vertices.Add(new VertexPositionColor(bottomLeft, color));   // Abajo-Izquierda
-                vertices.Add(new VertexPositionColor(bottomRight, color));  // Abajo-Derecha
-                vertices.Add(new VertexPositionColor(upperRight, color));   // Arriba-Derecha
-                vertices.Add(new VertexPositionColor(upperLeft, color));    // Arriba-Izquierda
+                vertices.Add(new VertexPositionNormalColorTexture(bottomLeft, normal, color, GetUV(bottomLeft)));   // Abajo-Izquierda
+                vertices.Add(new VertexPositionNormalColorTexture(bottomRight, normal, color, GetUV(bottomRight)));  // Abajo-Derecha
+                vertices.Add(new VertexPositionNormalColorTexture(upperRight, normal, color, GetUV(upperRight)));   // Arriba-Derecha
+                vertices.Add(new VertexPositionNormalColorTexture(upperLeft, normal, color, GetUV(upperLeft)));    // Arriba-Izquierda
 
 
                 //3(D)------------------ - 2(C)
@@ -96,11 +109,12 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
                 //0(A)------------------ - 1(B)
                 // Se realiza el calculo de los indices y se va agregando en la lista correspondiente
                 indices.Add((ushort)(start + 0));
+                indices.Add((ushort)(start + 2));
                 indices.Add((ushort)(start + 1));
-                indices.Add((ushort)(start + 2));
+
                 indices.Add((ushort)(start + 0));
-                indices.Add((ushort)(start + 2));
                 indices.Add((ushort)(start + 3));
+                indices.Add((ushort)(start + 2));
             }
 
             if (opening.Type == WallType.Solid)
@@ -119,7 +133,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
             if (opening.Type == WallType.Empty)
             {
                 // No dibujar la pared, sirve para los pasillos
-                return new MeshDataWithOpenings(new VertexPositionColor[0], new ushort[0], centers);
+                return new MeshDataWithOpenings(new VertexPositionNormalColorTexture[0], new ushort[0], centers);
             }
 
             // Calcualo del 'agujero' para puerta o ventana

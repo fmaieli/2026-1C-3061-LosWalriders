@@ -9,6 +9,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Types
     internal class HallwayRoom : IRoomAssets
     {
         public RoomType Type => RoomType.Hallway;
+        public string WallTexturePath => "Textures/rooms/wall/wall-hallway";
+        public string FloorTexturePath => "Textures/rooms/floor/floor_hallway";
 
         public List<string> Assets { get; } = new();
 

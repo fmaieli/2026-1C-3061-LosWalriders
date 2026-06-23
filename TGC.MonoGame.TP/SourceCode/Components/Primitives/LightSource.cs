@@ -11,6 +11,10 @@ namespace TGC.MonoGame.TP.SourceCode.Components
         public float Durability { get; set; }
         public float DecayRate { get; protected set; }      // Durabilidad que va perdiendo por segundo
         public float LightIntensity { get; protected set; } // Intensidad de la luz
+        public Vector3 LightColor { get; protected set; }
+        public float LightRadius { get; protected set; }
+        public bool IsSpotLight { get; protected set; }
+        public float SpotAngle { get; protected set; }
 
         public bool IsActive { get; set; }
 

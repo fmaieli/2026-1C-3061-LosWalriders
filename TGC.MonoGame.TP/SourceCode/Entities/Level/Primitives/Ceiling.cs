@@ -1,20 +1,24 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using TGC.MonoGame.TP.SourceCode.Geometries;
 
 namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Primitives
 {
     public class Ceiling
     {
-        public VertexPositionColor[] CreateCeiling(float width, float height, float depth, Color color)
+        public VertexPositionNormalColorTexture[] CreateCeiling(float width, float height, float depth, Color color)
         {
-            var ceilingVertices = new VertexPositionColor[4];
+            // Calculado para las texturas y se repitan correctamente
+            float u = (width * 2) / 50f;
+            float v = (depth * 2) / 50f;
+            Vector3 normal = Vector3.Down;
 
-            ceilingVertices[0] = new VertexPositionColor(new Vector3(-width, height, -depth), color);
-            ceilingVertices[1] = new VertexPositionColor(new Vector3(width, height, -depth), color);
-            ceilingVertices[2] = new VertexPositionColor(new Vector3(width, height, depth), color);
-            ceilingVertices[3] = new VertexPositionColor(new Vector3(-width, height, depth), color);
-
-            return ceilingVertices;
+            return new VertexPositionNormalColorTexture[] {
+                new(new Vector3(-width, height, -depth), normal, color, new Vector2(0, 0)),
+                new(new Vector3(width, height, -depth), normal, color, new Vector2(u, 0)),
+                new(new Vector3(width, height, depth), normal, color, new Vector2(u, v)),
+                new(new Vector3(-width, height, depth), normal, color, new Vector2(0, v))
+            };
         }
     }
 }

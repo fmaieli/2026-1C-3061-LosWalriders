@@ -8,6 +8,8 @@
 #endif
 
 float time;
+float bloodIntensity; // Intensidad de la sangre
+float grainIntensity; // Intensidad del noise (granulado filmico)
 
 texture baseTexture;
 sampler2D textureSampler = sampler_state
@@ -49,8 +51,15 @@ VertexShaderOutput MainVS(in VertexShaderInput input)
 
     output.Position = input.Position;
     output.TextureCoordinates = input.TextureCoordinates;
-	
     return output;
+}
+
+// Calculo 'random' para generar el noise (granulado filmico)
+float random(float2 uv, float t)
+{
+    // Gracias Patricio Gonzalez & Jen Lowe https://thebookofshaders.com/10/
+    // frac(x) - fractional part f of x
+    return frac(sin(dot(uv, float2(12.9898, 78.233)) + t) * 43758.5453);
 }
 
 float4 MergePS(VertexShaderOutput input) : COLOR
@@ -58,10 +67,22 @@ float4 MergePS(VertexShaderOutput input) : COLOR
     float4 baseColor = tex2D(textureSampler, input.TextureCoordinates);
 	float4 overlayColor = tex2D(overlayTextureSampler, input.TextureCoordinates);
     
-	float timeFactor = sin(time * 2.0) * 0.5 + 0.5;
-	float4 finalColor = float4(lerp(baseColor.rgb, overlayColor.rgb, overlayColor.a * timeFactor), 1.0);
+    // Efecto de sangre
+    // Para que la sangre 'palpite' con el tiempo
+	float timeFactor = sin(time * 5.0) * 0.3 + 0.7; 
+	float3 finalColor = lerp(baseColor.rgb, overlayColor.rgb, overlayColor.a * timeFactor * bloodIntensity);
     
-    return finalColor;
+    // Efecto de noise (granulado filmico)
+    if (grainIntensity > 0.0)
+    {
+        // Estatica en el tiempo
+        float noise = random(input.TextureCoordinates, time);
+        
+        // Se multiplica por 0.4 para que la pantalla no este totalmente negra
+        finalColor.rgb -= noise * grainIntensity * 0.4; 
+    }
+
+	return float4(finalColor, 1.0);
 }
 
 technique Merge

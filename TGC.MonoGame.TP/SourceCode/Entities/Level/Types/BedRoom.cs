@@ -9,6 +9,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Level.Types
     internal class BedRoom : IRoomAssets
     {
         public RoomType Type { get; } = RoomType.Bed;
+        public string WallTexturePath => "Textures/rooms/wall/wall-bedroom";
+        public string FloorTexturePath => "Textures/rooms/floor/floor_bedroom";
 
         public List<string> Assets { get; } = new()
         {

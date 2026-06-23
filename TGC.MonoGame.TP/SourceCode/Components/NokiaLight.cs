@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using System;
 
 namespace TGC.MonoGame.TP.SourceCode.Components
 {
@@ -8,11 +9,17 @@ namespace TGC.MonoGame.TP.SourceCode.Components
     {
         public NokiaLight()
         {
-            MaxDurability = 100f;
-            Durability = 100f;
-            DecayRate = 2.5f;     // Se pierden 2.5 unidades por segundo
-            LightIntensity = 1f;  // Ilumina al 100% - los fosforos podrian ser 0.3/0.4 para crear una diferencia
+            MaxDurability = 180f;   // Aumento el maximo de durabilidad
+            Durability = 180f;      // Durabilidad inicial = a maximo
+            DecayRate = 2f;         // Se pierden 2 unidades por segundo
+            LightIntensity = 1f;    // Ilumina al 100% - los fosforos podrian ser 0.3/0.4 para crear una diferencia
             IsActive = false;
+
+            LightColor = new Vector3(0.9f, 0.9f, 1.0f); // Blanco con algo de azul
+            LightIntensity = 1.2f;
+            LightRadius = 400f;
+            IsSpotLight = true;
+            SpotAngle = (float)Math.Cos(MathHelper.ToRadians(25f)); // Calculo del coseno para utilizarlo directamente en el shader
         }
 
         public override void LoadContent(ContentManager content, Effect baseEffect)
@@ -51,8 +58,10 @@ namespace TGC.MonoGame.TP.SourceCode.Components
                     fx.Parameters["World"]?.SetValue(nokiaWorld);
                     fx.Parameters["View"]?.SetValue(view);
                     fx.Parameters["Projection"]?.SetValue(projection);
-                    fx.Parameters["UseVertexColor"]?.SetValue(false);
-                    fx.Parameters["DiffuseColor"]?.SetValue(Color.White.ToVector3());
+                    fx.Parameters["UseVertexColor"]?.SetValue(0.0f);
+                    // Apagamos la iluminación ambiental para el celular
+                    fx.Parameters["IsLightActive"]?.SetValue(0.0f);
+                    fx.Parameters["DiffuseColor"]?.SetValue(Color.White.ToVector3() * 10f);
                 }
 
                 mesh.Draw();
