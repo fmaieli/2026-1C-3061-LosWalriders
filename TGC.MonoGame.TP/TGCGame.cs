@@ -470,7 +470,7 @@ public class TGCGame : Game
 
             case GameState.Victory:
                 IsMouseVisible = true;
-                if (_victoryScreen.Update() == MenuAction.MainMenu)
+                if (_victoryScreen.Update(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height) == MenuAction.MainMenu)
                 {
                     ResetGame();
                 }
@@ -681,108 +681,108 @@ public class TGCGame : Game
         }
         else
         {
-        if (_gameState == GameState.Menu)
-        {
-            // Dibujado de botones del menu
-            _menuScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
-        }
-        else if (_gameState == GameState.GameOver)
-        {
-            _gameOverScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice);
-        }
-        else if (_gameState == GameState.Victory)
-        {
-            _victoryScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice, _timeTaken);
-        }
-        else if (_gameState == GameState.Playing)
-        {
-            #region Timer
-            int minutes = (int)_gameTimer / 60;
-            int seconds = (int)_gameTimer % 60;
-            string timeText = $"{minutes:D2}:{seconds:D2}";
-
-            // Cuanto mide el texto para poder centrarlo en la pantalla
-            Vector2 textSize = _spriteFont.MeasureString(timeText) * uiScale;
-            Vector2 textPosition = new Vector2((GraphicsDevice.Viewport.Width - textSize.X) / 2f, 20f * uiScale);
-
-            // Sombra en texto para que se note un poco mas
-            _spriteBatch.DrawString(_spriteFont, timeText, textPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
-            // Dibujamos el texto blanco real, si queda 30 segundos o menos cambio el valor a rojo
-            _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
-            #endregion
-
-            #region Texto de Objetivo
-
-            string objectiveText = string.Empty;
-            float textScale = 0.55f;
-            // Evaluamos si el jugador ya tiene las 3 llaves para cambiar el texto
-            if (_player.CollectedKeys < 3)
+            if (_gameState == GameState.Menu)
             {
-                textScale = 0.55f;
-                objectiveText = "Busca y recolecta todas las llaves en la mansión";
+                // Dibujado de botones del menu
+                _menuScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
             }
-            else
+            else if (_gameState == GameState.GameOver)
             {
-                textScale = 0.45f;
-                objectiveText = "Busca tu premio en la habitación del fondo de la mansión";
+                _gameOverScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice);
             }
-
-            // Ubicado arriba a la izquierda
-            float finalObjScale = textScale * uiScale;
-            Vector2 objectivePosition = new Vector2(20f * uiScale, 20f * uiScale);
-
-            // Sombra del texto
-            _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition + new Vector2(2, 2),
-                                    Color.Black, 0f, Vector2.Zero, finalObjScale, SpriteEffects.None, 0f);
-
-            // Texto objetivo
-            _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition,
-                                    Color.White, 0f, Vector2.Zero, finalObjScale, SpriteEffects.None, 0f);
-            #endregion
-
-            #region Barra de durabilidad de luces
-            if (_player.IsLightActive)
+            else if (_gameState == GameState.Victory)
             {
-                float percentage = _player.CurrentLightDurabilityPercentage;
-
-                int barWidth  = (int)(400 * uiScale);
-                int barHeight = (int) (20 * uiScale);
-
-                // Centrado horizontalmente y en la parte inferior de la pantalla
-                int xPos = (GraphicsDevice.Viewport.Width - barWidth) / 2;
-                int yPos = GraphicsDevice.Viewport.Height - (int)(60 * uiScale); ;
-
-                // Fondo gris oscuro para la barra
-                _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, barWidth, barHeight), Color.DarkGray);
-
-                // Con el valor del porcentajo voy actualizando el valor lleno de la barra
-                int fillWidth = (int)(barWidth * percentage);
-                // Blanco para el valor del porcentaje restante
-                _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
+                _victoryScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice, _timeTaken);
             }
-            #endregion
+            else if (_gameState == GameState.Playing)
+            {
+                #region Timer
+                int minutes = (int)_gameTimer / 60;
+                int seconds = (int)_gameTimer % 60;
+                string timeText = $"{minutes:D2}:{seconds:D2}";
 
-            #region Llaves Recolectadas
-            // Texto arriba a la derecha HUD
-            string keysText = "Llaves: ";
+                // Cuanto mide el texto para poder centrarlo en la pantalla
+                Vector2 textSize = _spriteFont.MeasureString(timeText) * uiScale;
+                Vector2 textPosition = new Vector2((GraphicsDevice.Viewport.Width - textSize.X) / 2f, 20f * uiScale);
 
-            Vector2 keysPosition = new Vector2(GraphicsDevice.Viewport.Width - (250f * uiScale), 25f * uiScale);
+                // Sombra en texto para que se note un poco mas
+                _spriteBatch.DrawString(_spriteFont, timeText, textPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                // Dibujamos el texto blanco real, si queda 30 segundos o menos cambio el valor a rojo
+                _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                #endregion
 
-            _spriteBatch.DrawString(_spriteFont, keysText, keysPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
-            _spriteBatch.DrawString(_spriteFont, keysText, keysPosition, Color.White, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
-            #endregion
+                #region Texto de Objetivo
 
-            #region FPS
-            string fpsText = $"FPS: {_currentFps}";
-            Vector2 fpsPosition = new Vector2(20f * uiScale, GraphicsDevice.Viewport.Height - (50f * uiScale));
+                string objectiveText = string.Empty;
+                float textScale = 0.55f;
+                // Evaluamos si el jugador ya tiene las 3 llaves para cambiar el texto
+                if (_player.CollectedKeys < 3)
+                {
+                    textScale = 0.55f;
+                    objectiveText = "Busca y recolecta todas las llaves en la mansión";
+                }
+                else
+                {
+                    textScale = 0.45f;
+                    objectiveText = "Busca tu premio en la habitación del fondo de la mansión";
+                }
 
-            // Sombra de text
-            _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                // Ubicado arriba a la izquierda
+                float finalObjScale = textScale * uiScale;
+                Vector2 objectivePosition = new Vector2(20f * uiScale, 20f * uiScale);
 
-            // Dibujado del texto con validacion para que se ponga en rojo si baja de 30 FPS
-            _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition, _currentFps < 30 ? Color.Red : Color.Yellow, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
-            #endregion
-        }
+                // Sombra del texto
+                _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition + new Vector2(2, 2),
+                                        Color.Black, 0f, Vector2.Zero, finalObjScale, SpriteEffects.None, 0f);
+
+                // Texto objetivo
+                _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition,
+                                        Color.White, 0f, Vector2.Zero, finalObjScale, SpriteEffects.None, 0f);
+                #endregion
+
+                #region Barra de durabilidad de luces
+                if (_player.IsLightActive)
+                {
+                    float percentage = _player.CurrentLightDurabilityPercentage;
+
+                    int barWidth  = (int)(400 * uiScale);
+                    int barHeight = (int) (20 * uiScale);
+
+                    // Centrado horizontalmente y en la parte inferior de la pantalla
+                    int xPos = (GraphicsDevice.Viewport.Width - barWidth) / 2;
+                    int yPos = GraphicsDevice.Viewport.Height - (int)(60 * uiScale); ;
+
+                    // Fondo gris oscuro para la barra
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, barWidth, barHeight), Color.DarkGray);
+
+                    // Con el valor del porcentajo voy actualizando el valor lleno de la barra
+                    int fillWidth = (int)(barWidth * percentage);
+                    // Blanco para el valor del porcentaje restante
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
+                }
+                #endregion
+
+                #region Llaves Recolectadas
+                // Texto arriba a la derecha HUD
+                string keysText = "Llaves: ";
+
+                Vector2 keysPosition = new Vector2(GraphicsDevice.Viewport.Width - (250f * uiScale), 25f * uiScale);
+
+                _spriteBatch.DrawString(_spriteFont, keysText, keysPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                _spriteBatch.DrawString(_spriteFont, keysText, keysPosition, Color.White, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                #endregion
+
+                #region FPS
+                string fpsText = $"FPS: {_currentFps}";
+                Vector2 fpsPosition = new Vector2(20f * uiScale, GraphicsDevice.Viewport.Height - (50f * uiScale));
+
+                // Sombra de text
+                _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+
+                // Dibujado del texto con validacion para que se ponga en rojo si baja de 30 FPS
+                _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition, _currentFps < 30 ? Color.Red : Color.Yellow, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                #endregion
+            }
         }
 
         _spriteBatch.End();
