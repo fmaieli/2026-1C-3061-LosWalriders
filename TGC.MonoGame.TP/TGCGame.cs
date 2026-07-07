@@ -71,6 +71,8 @@ public class TGCGame : Game
 
     // Menu - Victory - GameOver
     private GameState _gameState = GameState.Menu;
+    private bool _showingControls = false;
+    private ControlsScreen _controlsScreen = new ControlsScreen();
     private MenuScreen _menuScreen = new MenuScreen();
     private VictoryScreen _victoryScreen = new VictoryScreen();
     private GameOverScreen _gameOverScreen = new GameOverScreen();
@@ -116,8 +118,8 @@ public class TGCGame : Game
         // Maneja la configuracion y la administracion del dispositivo grafico.
         _graphics = new GraphicsDeviceManager(this);
 
-        _graphics.PreferredBackBufferWidth = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width - 100;
-        _graphics.PreferredBackBufferHeight = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height - 100;
+        _graphics.PreferredBackBufferWidth = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width;
+        _graphics.PreferredBackBufferHeight = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height;
 
         // Para que el juego sea pantalla completa se puede usar Graphics IsFullScreen.
         // Carpeta raiz donde va a estar toda la Media.
@@ -278,13 +280,45 @@ public class TGCGame : Game
             MediaPlayer.IsMuted = !MediaPlayer.IsMuted;
         }
 
+        // Reinicio con la R
+        if (keyboardState.IsKeyDown(Keys.R) && _previousKeyboardState.IsKeyUp(Keys.R))
+        {
+            ResetGame();
+        }
+
+        if (keyboardState.IsKeyDown(Keys.C) && _previousKeyboardState.IsKeyUp(Keys.C))
+        {
+            if (_gameState == GameState.Playing || _gameState == GameState.Transitioning)
+            {
+                _showingControls = !_showingControls;
+                _controlsScreen.ShowBackButton = false;
+            }
+        }
+
+        // Muestra la pantalla de controles
+        if (_showingControls)
+        {
+            IsMouseVisible = true;
+            bool closeRequested = _controlsScreen.Update(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+
+            if (closeRequested)
+            {
+                _showingControls = false;
+                if (_gameState == GameState.Playing || _gameState == GameState.Transitioning)
+                    IsMouseVisible = false;
+            }
+
+            _previousKeyboardState = keyboardState;
+            return;
+        }
+
         switch (_gameState)
         {
             case GameState.Menu:
                 // Habilito el mouse para el menu
                 IsMouseVisible = true;
 
-                var action = _menuScreen.Update();
+                var action = _menuScreen.Update(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
                 if (action == MenuAction.Play)
                 {
                     _gameState = GameState.Transitioning;
@@ -293,6 +327,11 @@ public class TGCGame : Game
                     // Sonido de puerta de auto abriendose
                     _carDoorOpen.Play();
                     _hasPlayedDoorClose = false;
+                }
+                else if (action == MenuAction.Tutorial)
+                {
+                    _showingControls = true;
+                    _controlsScreen.ShowBackButton = true;
                 }
                 else if (action == MenuAction.Exit)
                 {
@@ -384,7 +423,7 @@ public class TGCGame : Game
                 }
                 #endregion
 
-                _player.Update(gameTime, _models);
+                _player.Update(gameTime, _models, GraphicsDevice.Viewport);
                 _enemy.Update(gameTime, _player.Position, _player.IsHidden);
 
                 // Distancia de granulado filmico con respecto al enemigo
@@ -423,7 +462,7 @@ public class TGCGame : Game
 
             case GameState.GameOver:
                 IsMouseVisible = true;
-                if (_gameOverScreen.Update() == MenuAction.MainMenu)
+                if (_gameOverScreen.Update(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height) == MenuAction.MainMenu)
                 {
                     ResetGame();
                 }
@@ -431,7 +470,7 @@ public class TGCGame : Game
 
             case GameState.Victory:
                 IsMouseVisible = true;
-                if (_victoryScreen.Update() == MenuAction.MainMenu)
+                if (_victoryScreen.Update(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height) == MenuAction.MainMenu)
                 {
                     ResetGame();
                 }
@@ -619,6 +658,7 @@ public class TGCGame : Game
                 _distortionEffect.Parameters["ScreenTexture"]?.SetValue(_distortionRenderTarget);
                 _distortionEffect.Parameters["Time"]?.SetValue((float)gameTime.TotalGameTime.TotalSeconds);
                 _distortionEffect.Parameters["BlurFactor"]?.SetValue(_distortionFactor);
+                _distortionEffect.Parameters["ScreenResolution"]?.SetValue(new Vector2(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height));
 
                 _fullScreenQuad.Draw(_distortionEffect);
 
@@ -633,107 +673,116 @@ public class TGCGame : Game
 
         _spriteBatch.Begin();
 
-        // Valido que este jugando antes de dibujar el HUD
-        if (_gameState == GameState.Menu)
+        float uiScale = GraphicsDevice.Viewport.Height / 720f;
+
+        if (_showingControls)
         {
-            // Dibujado de botones del menu
-            _menuScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture);
+            _controlsScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice);
         }
-        else if (_gameState == GameState.GameOver)
+        else
         {
-            _gameOverScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice);
-        }
-        else if (_gameState == GameState.Victory)
-        {
-            _victoryScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice, _timeTaken);
-        }
-        else if (_gameState == GameState.Playing)
-        {
-            #region Timer
-            int minutes = (int)_gameTimer / 60;
-            int seconds = (int)_gameTimer % 60;
-            string timeText = $"{minutes:D2}:{seconds:D2}";
-
-            // Cuanto mide el texto para poder centrarlo en la pantalla
-            Vector2 textSize = _spriteFont.MeasureString(timeText);
-            Vector2 textPosition = new Vector2((GraphicsDevice.Viewport.Width - textSize.X) / 2f, 20f);
-
-            // Sombra en texto para que se note un poco mas
-            _spriteBatch.DrawString(_spriteFont, timeText, textPosition + new Vector2(2, 2), Color.Black);
-            // Dibujamos el texto blanco real, si queda 30 segundos o menos cambio el valor a rojo
-            _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White);
-            #endregion
-
-            #region Texto de Objetivo
-            
-            string objectiveText = string.Empty;
-            float textScale = 0.55f;
-            // Evaluamos si el jugador ya tiene las 3 llaves para cambiar el texto
-            if (_player.CollectedKeys < 3)
+            if (_gameState == GameState.Menu)
             {
-                textScale = 0.55f;
-                objectiveText = "Busca y recolecta todas las llaves en la mansión";
+                // Dibujado de botones del menu
+                _menuScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
             }
-            else
+            else if (_gameState == GameState.GameOver)
             {
-                textScale = 0.45f;
-                objectiveText = "Busca tu premio en la habitación del fondo de la mansión";
+                _gameOverScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice);
             }
-
-            // Ubicado arriba a la izquierda
-            Vector2 objectivePosition = new Vector2(20f, 20f);
-
-            // Sombra del texto
-            _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition + new Vector2(2, 2),
-                                    Color.Black, 0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
-
-            // Texto objetivo
-            _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition,
-                                    Color.White, 0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
-            #endregion
-
-            #region Barra de durabilidad de luces
-            if (_player.IsLightActive)
+            else if (_gameState == GameState.Victory)
             {
-                float percentage = _player.CurrentLightDurabilityPercentage;
-
-                int barWidth = 400;
-                int barHeight = 20;
-
-                // Centrado horizontalmente y en la parte inferior de la pantalla
-                int xPos = (GraphicsDevice.Viewport.Width - barWidth) / 2;
-                int yPos = GraphicsDevice.Viewport.Height - 60;
-
-                // Fondo gris oscuro para la barra
-                _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, barWidth, barHeight), Color.DarkGray);
-
-                // Con el valor del porcentajo voy actualizando el valor lleno de la barra
-                int fillWidth = (int)(barWidth * percentage);
-                // Blanco para el valor del porcentaje restante
-                _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
+                _victoryScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice, _timeTaken);
             }
-            #endregion
+            else if (_gameState == GameState.Playing)
+            {
+                #region Timer
+                int minutes = (int)_gameTimer / 60;
+                int seconds = (int)_gameTimer % 60;
+                string timeText = $"{minutes:D2}:{seconds:D2}";
 
-            #region Llaves Recolectadas
-            // Texto arriba a la derecha HUD
-            string keysText = "Llaves: ";
+                // Cuanto mide el texto para poder centrarlo en la pantalla
+                Vector2 textSize = _spriteFont.MeasureString(timeText) * uiScale;
+                Vector2 textPosition = new Vector2((GraphicsDevice.Viewport.Width - textSize.X) / 2f, 20f * uiScale);
 
-            Vector2 keysPosition = new Vector2(GraphicsDevice.Viewport.Width - 250f, 25f);
+                // Sombra en texto para que se note un poco mas
+                _spriteBatch.DrawString(_spriteFont, timeText, textPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                // Dibujamos el texto blanco real, si queda 30 segundos o menos cambio el valor a rojo
+                _spriteBatch.DrawString(_spriteFont, timeText, textPosition, _gameTimer <= 30f ? Color.Red : Color.White, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                #endregion
 
-            _spriteBatch.DrawString(_spriteFont, keysText, keysPosition + new Vector2(2, 2), Color.Black);
-            _spriteBatch.DrawString(_spriteFont, keysText, keysPosition, Color.White);
-            #endregion
+                #region Texto de Objetivo
 
-            #region FPS
-            string fpsText = $"FPS: {_currentFps}";
-            Vector2 fpsPosition = new Vector2(20f, GraphicsDevice.Viewport.Height - 50f);
+                string objectiveText = string.Empty;
+                float textScale = 0.55f;
+                // Evaluamos si el jugador ya tiene las 3 llaves para cambiar el texto
+                if (_player.CollectedKeys < 3)
+                {
+                    textScale = 0.55f;
+                    objectiveText = "Busca y recolecta todas las llaves en la mansión";
+                }
+                else
+                {
+                    textScale = 0.45f;
+                    objectiveText = "Busca tu premio en la habitación del fondo de la mansión";
+                }
 
-            // Sombra de text
-            _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition + new Vector2(2, 2), Color.Black);
+                // Ubicado arriba a la izquierda
+                float finalObjScale = textScale * uiScale;
+                Vector2 objectivePosition = new Vector2(20f * uiScale, 20f * uiScale);
 
-            // Dibujado del texto con validacion para que se ponga en rojo si baja de 30 FPS
-            _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition, _currentFps < 30 ? Color.Red : Color.Yellow);
-            #endregion
+                // Sombra del texto
+                _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition + new Vector2(2, 2),
+                                        Color.Black, 0f, Vector2.Zero, finalObjScale, SpriteEffects.None, 0f);
+
+                // Texto objetivo
+                _spriteBatch.DrawString(_spriteFont, objectiveText, objectivePosition,
+                                        Color.White, 0f, Vector2.Zero, finalObjScale, SpriteEffects.None, 0f);
+                #endregion
+
+                #region Barra de durabilidad de luces
+                if (_player.IsLightActive)
+                {
+                    float percentage = _player.CurrentLightDurabilityPercentage;
+
+                    int barWidth  = (int)(400 * uiScale);
+                    int barHeight = (int) (20 * uiScale);
+
+                    // Centrado horizontalmente y en la parte inferior de la pantalla
+                    int xPos = (GraphicsDevice.Viewport.Width - barWidth) / 2;
+                    int yPos = GraphicsDevice.Viewport.Height - (int)(60 * uiScale); ;
+
+                    // Fondo gris oscuro para la barra
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, barWidth, barHeight), Color.DarkGray);
+
+                    // Con el valor del porcentajo voy actualizando el valor lleno de la barra
+                    int fillWidth = (int)(barWidth * percentage);
+                    // Blanco para el valor del porcentaje restante
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(xPos, yPos, fillWidth, barHeight), Color.White);
+                }
+                #endregion
+
+                #region Llaves Recolectadas
+                // Texto arriba a la derecha HUD
+                string keysText = "Llaves: ";
+
+                Vector2 keysPosition = new Vector2(GraphicsDevice.Viewport.Width - (250f * uiScale), 25f * uiScale);
+
+                _spriteBatch.DrawString(_spriteFont, keysText, keysPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                _spriteBatch.DrawString(_spriteFont, keysText, keysPosition, Color.White, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                #endregion
+
+                #region FPS
+                string fpsText = $"FPS: {_currentFps}";
+                Vector2 fpsPosition = new Vector2(20f * uiScale, GraphicsDevice.Viewport.Height - (50f * uiScale));
+
+                // Sombra de text
+                _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+
+                // Dibujado del texto con validacion para que se ponga en rojo si baja de 30 FPS
+                _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition, _currentFps < 30 ? Color.Red : Color.Yellow, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+                #endregion
+            }
         }
 
         _spriteBatch.End();
@@ -756,10 +805,10 @@ public class TGCGame : Game
                 for (int i = 0; i < 3; i++)
                 {
                     // Posicion de dibujo de las llaves
-                    float xPos = GraphicsDevice.Viewport.Width - 100f + (45f * i);
-                    float yPos = 60f; // Altura a la que se dibujan las llaves
+                    float xPos = GraphicsDevice.Viewport.Width - (100f * uiScale) + (45f * uiScale * i);
+                    float yPos = 60f * uiScale;  // Altura a la que se dibujan las llaves
 
-                    Matrix keyWorld = Matrix.CreateScale(1f) *                                                  // Tamaño del HUD
+                    Matrix keyWorld = Matrix.CreateScale(1f * uiScale) *                                                  // Tamaño del HUD
                                       Matrix.CreateRotationZ(MathHelper.PiOver2) *                              // Rotado en Z para que el modelo se note mas
                                       Matrix.CreateRotationY((float)gameTime.TotalGameTime.TotalSeconds * 2f) * // Se giran sobre Y para darle dinamismo al HUD
                                       Matrix.CreateTranslation(xPos, yPos, 0f);

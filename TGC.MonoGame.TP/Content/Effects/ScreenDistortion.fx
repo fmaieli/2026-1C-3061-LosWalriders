@@ -9,6 +9,7 @@
 
 float Time;
 float BlurFactor; // 1.0f ceguera - 0.0f vision normal
+float2 ScreenResolution;
 
 texture ScreenTexture;
 sampler2D ScreenSampler = sampler_state
@@ -44,7 +45,6 @@ float4 MainPS(VertexShaderOutput input) : COLOR0
 {
     float4 finalColor;
 
-    // Estructura segura: 1 sola puerta de salida para que DirectX no se pierda
     if (BlurFactor <= 0.001f)
     {
         finalColor = tex2D(ScreenSampler, input.TexCoord);
@@ -61,8 +61,8 @@ float4 MainPS(VertexShaderOutput input) : COLOR0
 
         // https://grokipedia.com/page/Kawase_Blur#implementation
         // https://learnopengl.com/In-Practice/2D-Game/Postprocessing
-        // Resolucion de 1280x720
-        float2 texel = float2(1.0f / 1280.0f, 1.0f / 720.0f) * 12.0f * BlurFactor;
+        // Utilizo ScreenResolution para calcular
+        float2 texel = float2(1.0f / ScreenResolution.x, 1.0f / ScreenResolution.y) * 12.0f * BlurFactor;
         
         // Gaussian Blur, tomo los 8 vecinos del pixel seleccionado
         float4 color = tex2D(ScreenSampler, uv);

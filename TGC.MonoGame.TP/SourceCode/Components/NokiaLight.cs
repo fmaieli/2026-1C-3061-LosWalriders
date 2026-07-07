@@ -9,8 +9,8 @@ namespace TGC.MonoGame.TP.SourceCode.Components
     {
         public NokiaLight()
         {
-            MaxDurability = 180f;   // Aumento el maximo de durabilidad
-            Durability = 180f;      // Durabilidad inicial = a maximo
+            MaxDurability = 210f;   // Aumento el maximo de durabilidad
+            Durability = 210f;      // Durabilidad inicial = a maximo
             DecayRate = 2f;         // Se pierden 2 unidades por segundo
             LightIntensity = 1f;    // Ilumina al 100% - los fosforos podrian ser 0.3/0.4 para crear una diferencia
             IsActive = false;
@@ -25,12 +25,24 @@ namespace TGC.MonoGame.TP.SourceCode.Components
         public override void LoadContent(ContentManager content, Effect baseEffect)
         {
             Model = content.Load<Model>("Models/Items/PSX_Nokia");
-            Effect = baseEffect;
 
             foreach (var mesh in Model.Meshes)
             {
                 foreach (var part in mesh.MeshParts)
-                    part.Effect = Effect.Clone();
+                {
+                    Texture2D modelTexture = null;
+                    var originalEffect = part.Effect;
+                    var textureParam = originalEffect?.Parameters["Texture"];
+                    if (textureParam != null && textureParam.ParameterType == EffectParameterType.Texture2D)
+                        modelTexture = textureParam.GetValueTexture2D();
+
+                    var fx = baseEffect.Clone();
+
+                    if (modelTexture != null)
+                        fx.Parameters["MainTexture"]?.SetValue(modelTexture);
+
+                    part.Effect = fx;
+                }
             }
         }
 
