@@ -9,8 +9,8 @@ namespace TGC.MonoGame.TP.SourceCode.Components
     {
         public MatchLight()
         {
-            MaxDurability = 15f;   // Dura solo 15 segundos
-            Durability = 15f;
+            MaxDurability = 18f;   // Dura solo 18 segundos
+            Durability = 18f;
             DecayRate = 1f;        // Pierde 1 punto por segundo
             LightIntensity = 0.4f; // Ilumina menos que la linterna
             IsActive = false;
@@ -23,12 +23,24 @@ namespace TGC.MonoGame.TP.SourceCode.Components
         public override void LoadContent(ContentManager content, Effect baseEffect)
         {
             Model = content.Load<Model>("Models/Items/PSX_Item_Match");
-            Effect = baseEffect;
 
             foreach (var mesh in Model.Meshes)
             {
                 foreach (var part in mesh.MeshParts)
-                    part.Effect = Effect.Clone();
+                {
+                    Texture2D modelTexture = null;
+                    var originalEffect = part.Effect;
+                    var textureParam = originalEffect?.Parameters["Texture"];
+                    if (textureParam != null && textureParam.ParameterType == EffectParameterType.Texture2D)
+                        modelTexture = textureParam.GetValueTexture2D();
+
+                    var fx = baseEffect.Clone();
+
+                    if (modelTexture != null)
+                        fx.Parameters["MainTexture"]?.SetValue(modelTexture);
+
+                    part.Effect = fx;
+                }
             }
         }
 
