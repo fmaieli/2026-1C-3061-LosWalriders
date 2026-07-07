@@ -56,11 +56,11 @@ namespace TGC.MonoGame.TP.SourceCode.Screens
             float uiScale = screenHeight / 720f;
 
             DrawButton(spriteBatch, font, pixelTexture, _btnPlay, "Jugar", mouseState, uiScale);
-            DrawButton(spriteBatch, font, pixelTexture, _btnTutorial, "Tutorial", mouseState, uiScale);
+            DrawButton(spriteBatch, font, pixelTexture, _btnTutorial, "Controles", mouseState, uiScale);
             DrawButton(spriteBatch, font, pixelTexture, _btnExit, "Salir", mouseState, uiScale);
         }
 
-        private void DrawButton(SpriteBatch spriteBatch, SpriteFont font, Texture2D pixel,
+        private void DrawButton(SpriteBatch spriteBatch, SpriteFont font, Texture2D pixel, 
             Rectangle bounds, string text, MouseState mouse, float uiScale)
         {
             // Efecto de hover, me fijo si la posicion del mouse esta dentro del rectangulo
@@ -75,7 +75,7 @@ namespace TGC.MonoGame.TP.SourceCode.Screens
             // Centrado del texto dentro del rectangulo
             Vector2 textSize = font.MeasureString(text) * uiScale;
             Vector2 textPos = new Vector2(
-                bounds.X + (bounds.Width - textSize.X) / 2,
+                bounds.X + (bounds.Width - textSize.X) / 2, 
                 bounds.Y + (bounds.Height - textSize.Y) / 2
             );
 

@@ -71,6 +71,8 @@ public class TGCGame : Game
 
     // Menu - Victory - GameOver
     private GameState _gameState = GameState.Menu;
+    private bool _showingControls = false;
+    private ControlsScreen _controlsScreen = new ControlsScreen();
     private MenuScreen _menuScreen = new MenuScreen();
     private VictoryScreen _victoryScreen = new VictoryScreen();
     private GameOverScreen _gameOverScreen = new GameOverScreen();
@@ -278,10 +280,36 @@ public class TGCGame : Game
             MediaPlayer.IsMuted = !MediaPlayer.IsMuted;
         }
 
-        // Reiniciar juego
+        // Reinicio con la R
         if (keyboardState.IsKeyDown(Keys.R) && _previousKeyboardState.IsKeyUp(Keys.R))
         {
             ResetGame();
+        }
+
+        if (keyboardState.IsKeyDown(Keys.C) && _previousKeyboardState.IsKeyUp(Keys.C))
+        {
+            if (_gameState == GameState.Playing || _gameState == GameState.Transitioning)
+            {
+                _showingControls = !_showingControls;
+                _controlsScreen.ShowBackButton = false;
+            }
+        }
+
+        // Muestra la pantalla de controles
+        if (_showingControls)
+        {
+            IsMouseVisible = true;
+            bool closeRequested = _controlsScreen.Update(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+
+            if (closeRequested)
+            {
+                _showingControls = false;
+                if (_gameState == GameState.Playing || _gameState == GameState.Transitioning)
+                    IsMouseVisible = false;
+            }
+
+            _previousKeyboardState = keyboardState;
+            return;
         }
 
         switch (_gameState)
@@ -299,6 +327,11 @@ public class TGCGame : Game
                     // Sonido de puerta de auto abriendose
                     _carDoorOpen.Play();
                     _hasPlayedDoorClose = false;
+                }
+                else if (action == MenuAction.Tutorial)
+                {
+                    _showingControls = true;
+                    _controlsScreen.ShowBackButton = true;
                 }
                 else if (action == MenuAction.Exit)
                 {
@@ -642,7 +675,12 @@ public class TGCGame : Game
 
         float uiScale = GraphicsDevice.Viewport.Height / 720f;
 
-        // Valido que este jugando antes de dibujar el HUD
+        if (_showingControls)
+        {
+            _controlsScreen.Draw(_spriteBatch, _spriteFont, _pixelTexture, GraphicsDevice);
+        }
+        else
+        {
         if (_gameState == GameState.Menu)
         {
             // Dibujado de botones del menu
@@ -744,6 +782,7 @@ public class TGCGame : Game
             // Dibujado del texto con validacion para que se ponga en rojo si baja de 30 FPS
             _spriteBatch.DrawString(_spriteFont, fpsText, fpsPosition, _currentFps < 30 ? Color.Red : Color.Yellow, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
             #endregion
+        }
         }
 
         _spriteBatch.End();

@@ -277,6 +277,17 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             IsHidden = false;
             _cameraPitch = 0f;
             Rotation = 0f;
+
+            if (nokiaLight != null)
+            {
+                nokiaLight.Durability = nokiaLight.MaxDurability;
+                nokiaLight.IsActive = false;
+            }
+            if (matchLight != null)
+            {
+                matchLight.Durability = matchLight.MaxDurability;
+                matchLight.IsActive = false;
+            }
         }
 
         private void HandleToggles(KeyboardState keyboardState)
