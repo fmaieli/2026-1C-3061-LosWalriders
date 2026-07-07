@@ -360,6 +360,9 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     Model currentLockModel = null;
                     string currentLockPath = null;
 
+                    // Escala puerta
+                    float currentDoorScale = 0.4f;
+
                     // Se cambia el modelo si es PrizeRoom y asignamos los candados
                     if (roomData.Value.Type == RoomType.Prize)
                     {
@@ -367,28 +370,28 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                         currentDoorModel = prizeDoorModel;
                         currentLockModel = lockModel;
                         currentLockPath = lockPath;
+                        currentDoorScale = 0.3f;
                     }
 
                     // Pared Frontal
-                    // Pared Frontal
                     PlaceDoorModel(frontOpening, new Vector3(doorOffsetX, 0, mergedDepthHalf), 0f,
                         z + heightCells - 1, x + widthCells / 2, z + heightCells, x + widthCells / 2,
-                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath, currentDoorScale);
 
                     // Pared Trasera
                     PlaceDoorModel(backOpening, new Vector3(doorOffsetX, 0, -mergedDepthHalf), MathHelper.Pi,
                         z, x + widthCells / 2, z - 1, x + widthCells / 2,
-                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath, currentDoorScale);
 
                     // Pared Izquierda
                     PlaceDoorModel(leftOpening, new Vector3(-mergedWidthHalf, 0, doorOffsetZ), -MathHelper.PiOver2,
                         z + heightCells / 2, x, z + heightCells / 2, x - 1,
-                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath, currentDoorScale);
 
                     // Pared Derecha
                     PlaceDoorModel(rightOpening, new Vector3(mergedWidthHalf, 0, doorOffsetZ), MathHelper.PiOver2,
                         z + heightCells / 2, x + widthCells - 1, z + heightCells / 2, x + widthCells,
-                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath);
+                        placedDoors, mergedWorldX, mergedWorldZ, currentDoorModel, currentDoorPath, models, currentLockModel, currentLockPath, currentDoorScale);
 
                     // Renderizado de modelos por habitacion
                     IRoomAssets roomTypeInstance = RoomFactory.Create(roomData.Value.Type);
@@ -478,6 +481,12 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     WallColliders.Add(new BoundingBox(basePos - new Vector3(10f, 0, 10f), basePos + new Vector3(10f, 100f, 10f)));
                 else if (name.Contains("PSX_Wooden_Closet"))
                     WallColliders.Add(new BoundingBox(basePos - new Vector3(20f, 0, 15f), basePos + new Vector3(20f, 100f, 15f)));
+                else if (name.Contains("PSX_Outdoor_Spooky_Tree"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(25f, 0, 25f), basePos + new Vector3(25f, 200f, 25f)));
+                else if (name.Contains("PSX_Outdoor_Bench"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(35f, 0, 20f), basePos + new Vector3(35f, 80f, 20f)));
+                else if (name.Contains("PSX_Lamp_Post"))
+                    WallColliders.Add(new BoundingBox(basePos - new Vector3(8f, 0, 8f), basePos + new Vector3(8f, 150f, 8f)));
             }
 
             // Cols y Rows es el length de mapLayout
@@ -544,7 +553,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                 modelCache[carPath] = carModel;
             }
 
-            Vector3 carPosition = cameraPosition + new Vector3(15f, -51f, 350f);
+            Vector3 carPosition = cameraPosition + new Vector3(15f, -51f, 395f);
             Matrix carWorld = Matrix.CreateScale(0.4f) * Matrix.CreateRotationY(MathHelper.ToRadians(270f)) * Matrix.CreateTranslation(carPosition);
             models.Add((carModel, carWorld, carPath));
 
@@ -661,7 +670,8 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             string doorPath,                        // Path del modelo
             List<(Model, Matrix, string)> models,   // La lista de modelos a renderizar
             Model lockModel = null,                 // Modelo candado
-            string lockPath = null)                 // Path candado
+            string lockPath = null,                 // Path candado
+            float doorScale = 0.4f)                 // Escala puerta
         {
             // Si no es una puerta, no se hace nada
             if (opening.Type != WallType.Door) return;
@@ -681,7 +691,7 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             Vector3 worldPos = new Vector3(mergedWorldX, 0f, mergedWorldZ) + localPos;
 
             Matrix doorWorld =
-                Matrix.CreateScale(0.4f) *      // Escalo el modelo para que entre en las aberturas de las puertas correctamente
+                Matrix.CreateScale(doorScale) *      // Escalo el modelo para que entre en las aberturas de las puertas correctamente
                 Matrix.CreateRotationY(rotY) *  // Roto la puerta para que encaje en la pared
                 Matrix.CreateTranslation(worldPos + Vector3.Transform(modelOffset, Matrix.CreateRotationY(rotY)));  // Posicion final con el offset rotado
 

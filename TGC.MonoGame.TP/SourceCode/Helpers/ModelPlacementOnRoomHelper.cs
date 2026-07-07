@@ -14,17 +14,17 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             var advanced = GeneratePlacementsAdvanced(room, roomWidth, roomDepth, cellSize, seed);
             var results = new List<(string, Vector3, float)>();
 
-            foreach (var item in advanced) 
+            foreach (var item in advanced)
                 results.Add((item.ModelPath, item.Position, item.Rotation.Y));
 
             return results;
         }
 
         // Rotacion en los ejes x,y,z
-        public static List<(string ModelPath, Vector3 Position, Vector3 Rotation)> GeneratePlacementsAdvanced(
+        public static List<(string ModelPath, Vector3 Position, Vector3 Rotation, float Scale)> GeneratePlacementsAdvanced(
             IRoomAssets room, float roomWidth, float roomDepth, float cellSize, int seed)
         {
-            var results = new List<(string, Vector3, Vector3)>();
+            var results = new List<(string, Vector3, Vector3, float)>();
             var rng = new Random(seed);
 
             // Calculamos el tamaño de la matriz
@@ -44,16 +44,16 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
             }
 
             // Registro el modelo en la lista final
-            void PlaceAdvanced(string modelPath, int c, int r, Vector3 rotation, float offsetY = 0f, Vector3 microOffset = default)
+            void PlaceAdvanced(string modelPath, int c, int r, Vector3 rotation, float offsetY = 0f, Vector3 microOffset = default, float scale = 1f)
             {
                 c = Math.Clamp(c, 0, cols - 1);
                 r = Math.Clamp(r, 0, rows - 1);
-                results.Add((modelPath, CellToWorld(c, r, offsetY, microOffset), rotation));
+                results.Add((modelPath, CellToWorld(c, r, offsetY, microOffset), rotation, scale));
             }
 
-            void Place(string modelPath, int c, int r, float rotY = 0f, float offsetY = 0f, Vector3 microOffset = default)
+            void Place(string modelPath, int c, int r, float rotY = 0f, float offsetY = 0f, Vector3 microOffset = default, float scale = 1f)
             {
-                PlaceAdvanced(modelPath, c, r, new Vector3(0, rotY, 0), offsetY, microOffset);
+                PlaceAdvanced(modelPath, c, r, new Vector3(0, rotY, 0), offsetY, microOffset, scale);
             }
 
             // Habitaciones
@@ -94,12 +94,12 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     Place("Level/Living/PSX_TV_Stand", tvCol1, 0, 0f, 0f, new Vector3(0, 0, 15f));
                     Place("Level/Living/PSX_TV_Stand", tvCol2, 0, 0f, 0f, new Vector3(0, 0, 15f));
 
-                    Place("Level/Living/PSX_Old_TV", tvCol1, 0, 0f, 30f, new Vector3(0, 0, 15f));
-                    Place("Level/Living/PSX_Playstation1", tvCol2, 0, 0f, 30f, new Vector3(0, 0, 15f));
+                    Place("Level/Living/PSX_Old_TV", tvCol1, 0, 0f, 40f, new Vector3(0, 0, 15f));
+                    Place("Level/Living/PSX_Playstation1", tvCol2, 0, 0f, 48f, new Vector3(0, 0, 15f), 0.5f);
 
                     // 2 Armchairs enfrente
-                    Place("Level/Living/PSX_Armchair", tvCol1, 2, MathHelper.Pi);
-                    Place("Level/Living/PSX_Armchair", tvCol2, 2, MathHelper.Pi);
+                    Place("Level/Living/PSX_Armchair", tvCol1, 2, MathHelper.Pi, 0f, new Vector3(0, 0, 35f));
+                    Place("Level/Living/PSX_Armchair", tvCol2, 2, MathHelper.Pi, 0f, new Vector3(0, 0, 35f));
 
                     // 2 Mesas a la derecha del centro de la habitación
                     int tableCol1 = midC + 4;
@@ -148,21 +148,24 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     break;
 
                 case RoomType.Computer:
+                    float computerScale = 0.75f;
+                    float chairScale = 0.55f;
+
                     for (int r = 1; r < rows - 1; r += 3)
                     {
                         // Se dibujan los modelos en 3 columnas, izquierda, centro y derecha
-                        int leftColumn = 1;
+                        int leftColumn = 2;
                         int centerColumn = cols / 2;
-                        int rightColumn = cols - 2;
+                        int rightColumn = cols - 3;
 
                         int[] tableCols = { leftColumn, centerColumn, rightColumn };
 
                         // Conjunto de mesa, PC y silla
                         foreach (int c in tableCols)
                         {
-                            Place("Level/Living/PSX_Wooden_Table", c, r);
-                            Place("Level/Computer/PSX_Dirty_Old_PC", c, r, 0f, 35f);
-                            Place("Level/Computer/PSX_Computer_Chair", c, r, MathHelper.Pi, 0f, new Vector3(0, 0, 10f));
+                            Place("Level/Living/PSX_Wooden_Table", c, r, 0f, 0f, default);
+                            Place("Level/Computer/PSX_Dirty_Old_PC", c, r, 0f, 48f, new Vector3(0, 0, -5f), computerScale);
+                            Place("Level/Computer/PSX_Computer_Chair", c, r, MathHelper.Pi, 0f, new Vector3(0, 0, 40f), chairScale);
                         }
 
                         // Se bloquea aleatoriamente el hueco de la izquierda o el de la derecha entre el conjunto de objetos
@@ -173,13 +176,13 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                         {
                             // Colocamos el papel justo en medio del pasillo izquierdo
                             int gapColumn = (leftColumn + centerColumn) / 2;
-                            Place("Miscellaneous/PSX_Paper_Stack", gapColumn, r);
+                            Place("Miscellaneous/PSX_Paper_Stack", gapColumn, r, 0f, 0f, default, 1.5f);
                         }
                         else
                         {
                             // Colocamos el papel justo en medio del pasillo derecho
                             int gapColumn = (centerColumn + rightColumn) / 2;
-                            Place("Miscellaneous/PSX_Paper_Stack", gapColumn, r);
+                            Place("Miscellaneous/PSX_Paper_Stack", gapColumn, r, 0f, 0f, default, 1.5f);
                         }
                     }
                     break;
@@ -196,14 +199,17 @@ namespace TGC.MonoGame.TP.SourceCode.Helpers
                     break;
 
                 case RoomType.Outdoor:
-                    // Árbol tenebroso en el medio
-                    Place("Level/Outdoor/LowPoly_Tree", midC, midR);
-                    // Coleccionable en el centro
-                    Place("Miscellaneous/PSX_Paper_Stack", midC, midR + 1);
+                    float postScale = 0.15f;
 
-                    // Barriles oxidados en esquinas
-                    Place("Miscellaneous/PSX_Rusty_Barell", 0, 0);
-                    Place("Miscellaneous/PSX_Wooden_Barrel", cols - 1, rows - 1);
+                    // Arbol tenebroso en el medio
+                    Place("Level/Outdoor/PSX_Outdoor_Spooky_Tree", midC, midR, 0f, -5f);
+                    // Banco
+                    Place("Level/Outdoor/PSX_Outdoor_Bench", midC, midR + 5);
+
+                    // Postes de luz
+                    Place("Level/Outdoor/PSX_Lamp_Post", midC, midR + 5, 0f, 0f, new Vector3(100f, 0, 0), postScale);
+                    Place("Level/Outdoor/PSX_Lamp_Post", 0, 0, 0f, 0f, default, postScale);
+                    Place("Level/Outdoor/PSX_Lamp_Post", cols - 1, rows - 1, 0f, 0f, default, postScale);
                     break;
 
                 case RoomType.Hallway:

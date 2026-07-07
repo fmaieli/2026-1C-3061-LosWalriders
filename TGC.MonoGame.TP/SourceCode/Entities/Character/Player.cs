@@ -42,7 +42,6 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
         private bool _noClipMode = false;
 
         private KeyboardState _previousKeyboardState;
-        private MouseState _previousMouseState;        
 
         private Model _armsModel;
         private Effect _armsEffect;
@@ -118,7 +117,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             matchLight?.Draw(view, projection, cameraWorld);
         }
 
-        public void Update(GameTime gameTime, List<(Model Model, Matrix World, string Name)> models)
+        // Agrego Viewport para saber donde esta el centro de la pantalla
+        public void Update(GameTime gameTime, List<(Model Model, Matrix World, string Name)> models, Viewport viewport)
         {
             var keyboardState = Keyboard.GetState();
             var mouseState = Mouse.GetState();
@@ -185,21 +185,27 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             float moveSpeed = _freeCameraMode ? 600f : 300f;
             float turnSpeed = 3f;
 
-            // Implementacion vista desde mouse
-            if (_previousMouseState != default)
-            {
-                float mouseSensitivity = 0.003f;
-                // Calculo cuanto se movio el mouse desde el frame anterior
-                int deltaX = mouseState.X - _previousMouseState.X;
-                int deltaY = mouseState.Y - _previousMouseState.Y;
+            // Centro de la pantalla
+            int centerX = viewport.Width / 2;
+            int centerY = viewport.Height / 2;
 
-                // Multiplico el valor obtenido por la sensibilidad para modificar la nueva posicion de la camara
-                Rotation -= deltaX * mouseSensitivity;      // Eje X
-                _cameraPitch -= deltaY * mouseSensitivity;  // Eje Y
-            }
-            _previousMouseState = mouseState;
+            // Reduzco un poco la sensibilidad
+            float mouseSensitivity = 0.005f;
 
-            // Rotacion de la camara para modo normal con el teclado
+            // Calculo cuanto se movio el mouse desde el centro Calculamos cuanto nos movimos desde el centro
+            int deltaX = mouseState.X - centerX;
+            int deltaY = mouseState.Y - centerY;
+
+            // Rotacion con sensibilidad del mouse
+            Rotation -= deltaX * mouseSensitivity;
+            _cameraPitch -= deltaY * mouseSensitivity;
+
+            // Limite al pitch para no dar una vuelta completa de forma vertical
+            _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
+
+            // Fuerzo el mouse en el centro
+            Mouse.SetPosition(centerX, centerY);
+
             if (keyboardState.IsKeyDown(Keys.Left)) Rotation += turnSpeed * elapsedTime;
             if (keyboardState.IsKeyDown(Keys.Right)) Rotation -= turnSpeed * elapsedTime;
 
@@ -209,9 +215,6 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                 if (keyboardState.IsKeyDown(Keys.Up)) _cameraPitch += turnSpeed * elapsedTime;
                 if (keyboardState.IsKeyDown(Keys.Down)) _cameraPitch -= turnSpeed * elapsedTime;
             }
-
-            // Limitamos el pitch para no dar una vuelta completa
-            _cameraPitch = MathHelper.Clamp(_cameraPitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);            
 
             // Mirar hacia arriba y hacia abajo pero manteniendo la misma altura en el plano XZ
             forward.Y = 0f;
@@ -226,7 +229,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                 if (keyboardState.IsKeyDown(Keys.S)) movement -= forward * moveSpeed * elapsedTime;
                 if (keyboardState.IsKeyDown(Keys.A)) movement -= right * moveSpeed * elapsedTime;
                 if (keyboardState.IsKeyDown(Keys.D)) movement += right * moveSpeed * elapsedTime;
-            }            
+            }
 
             // Separo los tipos de modo de movimiento del jugador
             if (_freeCameraMode || _noClipMode)
@@ -261,6 +264,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             }
             #endregion
 
+            cameraRotation = Matrix.CreateFromYawPitchRoll(Rotation, _cameraPitch, 0f);
             View = Matrix.CreateLookAt(Position, Position + Vector3.Transform(Vector3.Forward, cameraRotation), Vector3.Up);
             _previousKeyboardState = keyboardState;
         }
@@ -271,6 +275,8 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
             CollectedKeys = 0;
             HasWon = false;
             IsHidden = false;
+            _cameraPitch = 0f;
+            Rotation = 0f;
         }
 
         private void HandleToggles(KeyboardState keyboardState)
@@ -315,7 +321,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                     matchLight?.Toggle();
                     if (matchLight.IsActive && nokiaLight != null) nokiaLight.IsActive = false;
                 }
-            }            
+            }
         }
 
         private void HandleInteraction(KeyboardState keyboardState, List<(Model Model, Matrix World, string Name)> models)
@@ -366,8 +372,7 @@ namespace TGC.MonoGame.TP.SourceCode.Entities.Character
                         {
                             Debug.WriteLine("Aun no se te acabaron los fosforos");
                         }
-                    }
-                    
+                    }                    
                     else if (model.Name.Contains("PSX_Item_Lock_Locked") || model.Name.Contains("PSX_Item_Door"))
                     {
                         var lockIndices = new List<int>();

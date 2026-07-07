@@ -11,12 +11,17 @@ namespace TGC.MonoGame.TP.SourceCode.Screens
         private MouseState _prevMouseState;
 
         public void Initialize(int screenWidth, int screenHeight)
-        {
-            _btnMainMenu = new Rectangle((screenWidth - 300) / 2, screenHeight / 2 + 100, 300, 60);
-        }
+        { }
 
-        public MenuAction Update()
+        public MenuAction Update(int screenWidth, int screenHeight)
         {
+            float uiScale = screenHeight / 720f;
+            int btnWidth = (int)(300 * uiScale);
+            int btnHeight = (int)(60 * uiScale);
+
+            // Calculo boton segun viewport
+            _btnMainMenu = new Rectangle((screenWidth - btnWidth) / 2, screenHeight / 2 + (int)(100 * uiScale), btnWidth, btnHeight);
+
             var mouseState = Mouse.GetState();
             MenuAction action = MenuAction.None;
 
@@ -33,32 +38,32 @@ namespace TGC.MonoGame.TP.SourceCode.Screens
 
         public void Draw(SpriteBatch spriteBatch, SpriteFont font, Texture2D pixelTexture, GraphicsDevice graphicsDevice)
         {
-            // Fondo completamente negro
+            float uiScale = graphicsDevice.Viewport.Height / 720f;
+
             spriteBatch.Draw(pixelTexture, new Rectangle(0, 0, graphicsDevice.Viewport.Width, graphicsDevice.Viewport.Height), Color.Black);
 
             string titleText = "Game Over!";
             string subText = "El monstruo te atrapo.";
 
-            Vector2 titleSize = font.MeasureString(titleText);
-            Vector2 subSize = font.MeasureString(subText);
+            Vector2 titleSize = font.MeasureString(titleText) * uiScale;
+            Vector2 subSize = font.MeasureString(subText) * uiScale;
             Vector2 centerScreen = new Vector2(graphicsDevice.Viewport.Width / 2f, graphicsDevice.Viewport.Height / 2f);
 
-            Vector2 titlePos = centerScreen - new Vector2(titleSize.X / 2f, titleSize.Y + 15f);
-            Vector2 subPos = centerScreen + new Vector2(-subSize.X / 2f, 15f);
+            Vector2 titlePos = centerScreen - new Vector2(titleSize.X / 2f, titleSize.Y + (15f * uiScale));
+            Vector2 subPos = centerScreen + new Vector2(-subSize.X / 2f, 15f * uiScale);
 
             // Sombras
-            spriteBatch.DrawString(font, titleText, titlePos + new Vector2(3, 3), Color.DarkRed);
-            spriteBatch.DrawString(font, subText, subPos + new Vector2(2, 2), Color.Black);
+            spriteBatch.DrawString(font, titleText, titlePos + new Vector2(3, 3), Color.DarkRed, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+            spriteBatch.DrawString(font, subText, subPos + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
 
-            // Texto principal
-            spriteBatch.DrawString(font, titleText, titlePos, Color.Red);
-            spriteBatch.DrawString(font, subText, subPos, Color.White);
+            // Textos
+            spriteBatch.DrawString(font, titleText, titlePos, Color.Red, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+            spriteBatch.DrawString(font, subText, subPos, Color.White, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
 
-            // Boton de reinicio
-            DrawButton(spriteBatch, font, pixelTexture, _btnMainMenu, "Volver al Inicio", Mouse.GetState());
+            DrawButton(spriteBatch, font, pixelTexture, _btnMainMenu, "Volver al Inicio", Mouse.GetState(), uiScale);
         }
 
-        private void DrawButton(SpriteBatch spriteBatch, SpriteFont font, Texture2D pixel, Rectangle bounds, string text, MouseState mouse)
+        private void DrawButton(SpriteBatch spriteBatch, SpriteFont font, Texture2D pixel, Rectangle bounds, string text, MouseState mouse, float uiScale)
         {
             bool isHover = bounds.Contains(mouse.Position);
             Color bgColor = isHover ? Color.DarkRed : Color.Black;
@@ -66,11 +71,11 @@ namespace TGC.MonoGame.TP.SourceCode.Screens
 
             spriteBatch.Draw(pixel, bounds, bgColor * 0.8f);
 
-            Vector2 textSize = font.MeasureString(text);
+            Vector2 textSize = font.MeasureString(text) * uiScale;
             Vector2 textPos = new Vector2(bounds.X + (bounds.Width - textSize.X) / 2, bounds.Y + (bounds.Height - textSize.Y) / 2);
 
-            spriteBatch.DrawString(font, text, textPos + new Vector2(2, 2), Color.Black);
-            spriteBatch.DrawString(font, text, textPos, textColor);
+            spriteBatch.DrawString(font, text, textPos + new Vector2(2, 2), Color.Black, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
+            spriteBatch.DrawString(font, text, textPos, textColor, 0f, Vector2.Zero, uiScale, SpriteEffects.None, 0f);
         }
     }
 }
