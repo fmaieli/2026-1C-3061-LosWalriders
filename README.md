@@ -35,3 +35,7 @@ TGC, Tgcito  |  Apellido, Nombre
 ## Game Play
 
 [![Watch the video](https://img.youtube.com/vi/pgEwUC0jvH4/0.jpg)](https://www.youtube.com/playlist?list=PLRM4L32DjvnazuMl8wZlbpEYL5Qh63ulG)
+
+## Models
+
+[Barney The Purple Dinosaur](https://sketchfab.com/3d-models/barney-the-purple-dinosaur-054330f9d24c4e91a2a8145feb059496)
